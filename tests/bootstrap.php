@@ -72,7 +72,19 @@ class FakeProduct {
     function set_stock_quantity($v) { $this->d['qty'] = $v; }
     function set_stock_status($v) { $this->d['stock_status'] = $v; }
     function save() { $this->d['saved'] = true; }
+    function set_name($v) { $this->d['name'] = $v; }
+    function set_description($v) { $this->d[$this->d['type'] === 'variation' ? 'desc' : 'long'] = $v; }
+    function set_short_description($v) { $this->d['short'] = $v; }
+    function is_on_sale() { return !empty($this->d['on_sale']); }
+    function set_regular_price($v) { $this->d['price'] = (float) $v; }
+    function get_tax_class() { return ''; }
+    function get_tax_status() { return 'none'; }
 }
+function sanitize_text_field($s) { return trim(strip_tags($s)); }
+function wp_kses_post($s) { return $s; }
+function wc_format_decimal($v) { return $v; }
+function wc_get_price_excluding_tax($p) { return isset($p->d['price']) ? $p->d['price'] : 0; }
+if (!defined('HOUR_IN_SECONDS')) { define('HOUR_IN_SECONDS', 3600); }
 
 // Action Scheduler simulé
 $GLOBALS['axo_as'] = array();

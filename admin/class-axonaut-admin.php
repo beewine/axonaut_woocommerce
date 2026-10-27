@@ -14,6 +14,7 @@ require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-display.php"
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/log.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-sync-settings.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-product-import.php";
 
 class Axonaut_Admin
 {
@@ -232,6 +233,9 @@ class Axonaut_Admin
             echo "<option value='" . esc_attr($key) . "'" . selected($value, $key, false) . ">" . esc_html($label) . "</option>";
         }
         echo "</select>";
+        if ($field !== 'stock') {
+            echo "<p class='description'>" . esc_html__("Les modifications faites dans Axonaut sont reprises toutes les heures (import planifié).", "axonaut") . "</p>";
+        }
         if ($field === 'stock') {
             echo "<p class='description'>" . esc_html__("Axonaut vers WooCommerce ou dans les deux sens : nécessite le webhook décrit ci-dessous. Le stock est envoyé à Axonaut 30 secondes après un changement.", "axonaut") . "</p>";
         }
@@ -434,6 +438,9 @@ class Axonaut_Admin
                 echo " ";
             }
             $product_manager->dump();
+        }
+        if (Axonaut_Product_Import::start()) {
+            echo " " . esc_html__("Import des modifications d'Axonaut planifié.", "axonaut");
         }
         wp_die();
     }
