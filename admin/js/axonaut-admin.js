@@ -32,7 +32,7 @@
     $('form[name=sync]').submit(function () {
 
         // Maybe show a loading indicator...
-        $.get($(this).attr('action'), $(this).serialize(), function (res) {
+        $.post($(this).attr('action'), $(this).serialize(), function (res) {
             // Do something with the response `res`
             $("#loading").hide();
             alert(res);

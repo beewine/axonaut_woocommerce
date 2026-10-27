@@ -10,6 +10,7 @@
  * @subpackage Axonaut/includes
  */
 
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-api.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-product.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 
@@ -17,9 +18,6 @@ require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 class ProductManager
 {
     private $wordpress_products = array();
-
-//    private $baseUrl = "http://localhost/axonauts4/public/index.php";
-    private $baseUrl = "https://axonaut.com";
 
     /**
      * ProductManager constructor.
@@ -160,19 +158,7 @@ class ProductManager
 
         foreach ($catalog as $catalogPart) {
             axonaut_write_log("Sending " . sizeof($catalogPart) ." products to Axonaut.");
-            try {
-                $request = wp_remote_post($this->baseUrl . '/api/v2/private/products-catalog', array(
-                    'headers' => array(
-                        'Content-Type' => 'application/json',
-                        'userApiKey' => get_option('axonaut_api_key'),
-                        'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-                    ),
-                    'body' => json_encode(array("catalog" => $catalogPart)),
-                    'sslverify' => false,
-                ));
-            } catch (Exception $e) {
-                axonaut_write_log("[ Products ] " . $e->getMessage());
-            }
+            Axonaut_Api::post('/api/v2/private/products-catalog', array("catalog" => $catalogPart), array('timeout' => 60));
         }
     }
 

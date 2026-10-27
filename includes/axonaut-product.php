@@ -8,7 +8,7 @@
  * @subpackage Axonaut/includes
  */
 
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/log.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-api.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 
 
@@ -29,9 +29,6 @@ class AxonautProduct
     private $jobCosting;
     private $stock;
     private $priceWithTax;
-
-//    private $baseUrl = "http://localhost/axonauts4/public/index.php";
-    private $baseUrl = "https://axonaut.com";
 
 	/**
 	 * AxonautProduct constructor.
@@ -78,54 +75,27 @@ class AxonautProduct
 	/**
 	 * Get the Axonaut product
 	 *
-	 * @return bool|null
+	 * @return array|null
 	 */
 	public function get_axonaut_product()
 	{
 		$wcId = $this->wcProduct->get_id();
 
-        // GET /api/v2/products
-        $request = wp_remote_get($this->baseUrl . '/api/v2/products?internal_id=' . $wcId, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'userApiKey' => get_option( 'axonaut_api_key' ),
-                'page' => 1,
-                'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-            ),
-            'sslverify' => false,
-        ));
+		$result = Axonaut_Api::get('/api/v2/products', array('internal_id' => $wcId), array('page' => 1));
+		if (!$result['ok'] || empty($result['data'])) {
+			return null;
+		}
 
-        if (is_wp_error($request)) {
-            $error = $request->get_error_message();
-            axonaut_write_log( "Something went wrong in axonaut-product::get_axonaut_product() (1) : $error", AXONAUT_LOG_ERROR );
-
-            return null;
-        } else {
-            // No WordPress error
-            $response = json_decode($request["body"], true);
-            if (!empty($response["error"])) {
-                // Axonaut error
-                if ($response["error"]["status_code"] == "404") {
-                    axonaut_write_log("[ Product : " . $wcId . " ] Product not found : " . json_encode($response["error"]), AXONAUT_LOG_ERROR);
-                } else {
-                    axonaut_write_log("[ Product : " . $wcId . " ] Error when trying to retrieve the product : " . json_encode($response["error"]), AXONAUT_LOG_ERROR);
-                }
-                return null;
-            } else {
-                $products = $response;
-
-                return $products[0];
-            }
-        }
+		return $result['data'][0];
 	}
 
     /**
      * Send request to synchronize one product.
-     * @return bool
+     * @return bool|null
      */
     public function send()
     {
-    	$axonautProduct = $this->get_axonaut_product($this->wcProduct);
+        $axonautProduct = $this->get_axonaut_product();
 
         axonaut_write_log("[ Product : ".$this->internalId." ] Sending product from WooCommerce to Axonaut...");
 
@@ -134,7 +104,7 @@ class AxonautProduct
 		    "price" => $this->price,
 		    "tax_rate" => $this->taxRate,
 		    "description" => $this->description,
-		    "internal_id" => $this->internalId,
+		    "internal_id" => (string) $this->internalId,
 		    "product_code" => $this->productCode,
 		    "weight" => $this->weight,
 		    "location" => $this->location,
@@ -143,51 +113,16 @@ class AxonautProduct
 	    );
 
         if (!empty($axonautProduct)) {
-			// PATCH /api/v2/products
-	        $method = "PATCH";
-            axonaut_write_log("[ Product : " . $this->wcProduct->get_id() . " ] This product already exists. $method product. ");
-	        $request = wp_remote_request($this->baseUrl . '/api/v2/products/'.$axonautProduct["id"], array(
-		        'headers' => array(
-			        'Content-Type' => 'application/json',
-			        'userApiKey' => get_option('axonaut_api_key'),
-			        'page' => 1,
-                    'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-		        ),
-		        'method' => "PATCH",
-		        'body' => json_encode($body),
-                'sslverify' => false,
-	        ));
+            $result = Axonaut_Api::patch('/api/v2/products/' . $axonautProduct["id"], $body);
         } else {
-	        // POST /api/v2/products
-	        $method = "POST";
-            axonaut_write_log("[ Product : " . $this->wcProduct->get_id() . " ] This product does not exist. $method product.");
-	        $request = wp_remote_post($this->baseUrl . '/api/v2/products', array(
-		        'headers' => array(
-			        'Content-Type' => 'application/json',
-			        'userApiKey' => get_option('axonaut_api_key'),
-                    'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-		        ),
-		        'body' => json_encode($body),
-                'sslverify' => false,
-	        ));
+            $result = Axonaut_Api::post('/api/v2/products', $body);
         }
 
-        if (is_wp_error($request)) {
-            $error = $request->get_error_message();
-            axonaut_write_log("Something went wrong in axonaut-product::send() : $error", AXONAUT_LOG_ERROR);
+        if (!$result['ok']) {
             return null;
-        } else {
-	        // No WordPress error
-	        $response = json_decode($request["body"], true);
-	        if (!empty($response["error"])) {
-		        // Axonaut error
-                axonaut_write_log("[ Product : " . $this->wcProduct->get_id() . " ] Error when trying to $method the product : " . json_encode($response["error"]), AXONAUT_LOG_ERROR);
-
-		        return null;
-	        }
-
-            axonaut_write_log("[ Product : " . $this->wcProduct->get_id() . " ] $method product OK (Axonaut ID : " . $response["id"] . ")");
         }
+
+        axonaut_write_log("[ Product : " . $this->internalId . " ] Product synchronized (Axonaut ID : " . $result['data']["id"] . ")");
 
         return true;
     }

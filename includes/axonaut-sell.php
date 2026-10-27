@@ -10,6 +10,7 @@
  * @subpackage Axonaut/includes
  */
 
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-api.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-product.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/product-manager.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
@@ -21,9 +22,6 @@ class AxonautSell
 {
     private $orderNumber;
     private $order;
-
-//    private $baseUrl = "http://localhost/axonauts4/public/index.php";
-    private $baseUrl = "https://axonaut.com";
 
     /**
      * AxonautSell constructor.
@@ -207,33 +205,14 @@ class AxonautSell
 
         axonaut_write_log(json_encode($body));
 
-        $request = wp_remote_post($this->baseUrl . '/api/v2/invoices', array(
-        	'headers' => array(
-		        'userApiKey' => get_option('axonaut_api_key'),
-		        'Content-Type' => 'application/json',
-                'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-	        ),
-	        'body' => json_encode($body),
-            'sslverify' => false,
-        ));
-
-        if (is_wp_error($request)) {
-            $error = $request->get_error_message();
-            axonaut_write_log("Something went wrong in axonaut-sell::send() (1) : $error", AXONAUT_LOG_ERROR);
+        $result = Axonaut_Api::post('/api/v2/invoices', $body);
+        if (!$result['ok']) {
             return false;
-        } else {
-	        // No WordPress error
-	        $response = json_decode($request["body"], true);
-	        if (!empty($response["error"])) {
-		        // Axonaut error
-                axonaut_write_log("[ Order : " . $this->orderNumber . " ] Error when trying to post the invoice : " . json_encode($response["error"]), AXONAUT_LOG_ERROR);
-		        return false;
-	        }
-
-            axonaut_write_log( "[ Order : $this->orderNumber ] Invoice created (" . $response["id"] . ")." );
-
-	        return $response["id"];
         }
+
+        axonaut_write_log("[ Order : $this->orderNumber ] Invoice created (" . $result['data']["id"] . ").");
+
+        return $result['data']["id"];
     }
 
     /**
@@ -245,49 +224,27 @@ class AxonautSell
     {
         axonaut_write_log("[ Order : ".$this->orderNumber." ] Sending payment to Axonaut...");
 
-        $request = wp_remote_get($this->baseUrl . '/api/v2/invoices?internal_ref='.$this->orderNumber, array(
-        	'headers' => array(
-        		'userApiKey' => get_option('axonaut_api_key'),
-		        'Content-Type' => 'application/json',
-		        'page' => 1,
-                'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-	        ),
-            'sslverify' => false,
-        ));
+        $result = Axonaut_Api::get('/api/v2/invoices', array('internal_ref' => $this->orderNumber), array('page' => 1));
 
-        if (is_wp_error($request)) {
-            $error = $request->get_error_message();
-            axonaut_write_log("Something went wrong in axonaut-sell::send_pay() (1) : $error");
-            return false;
-        } else {
-	        // No WordPress error
-	        $response = json_decode($request["body"], true);
-            if (!empty($response["error"])) {
-            	if ($response["error"]["status_code"] == "404") {
-		            // Aucune facture avec ce numéro de commande n'a été trouvée. Créer la facture.
-                    axonaut_write_log( "[ Order : " . $this->orderNumber . " ] Invoice does not exist in Axonaut - Create the invoice." );
-		            $axonautInvoiceId = $this->send();
-	            } else {
-            		// Autre erreur. Log.
-                    axonaut_write_log("[ Order : " . $this->orderNumber . " ] Error when trying to retrieve the invoice : " . json_encode($response["error"]));
-		            return false;
-	            }
-            } else {
-                $axonautInvoice = $response[0];
-                $axonautInvoiceId = $axonautInvoice["id"];
-                if(!is_null($axonautInvoice["paid_date"])) {
-					// La facture a déjà été payée
-					// Ne pas continuer
-                    axonaut_write_log( "[ Order : " . $this->orderNumber . " ] This invoice has already been paid (" . $axonautInvoiceId . " - " .$axonautInvoice["paid_date"] . ")." );
-
-					return false;
-				}
+        if ($result['ok'] && !empty($result['data'])) {
+            $axonautInvoice = $result['data'][0];
+            $axonautInvoiceId = $axonautInvoice["id"];
+            if (!is_null($axonautInvoice["paid_date"])) {
+                // La facture a déjà été payée : ne pas continuer
+                axonaut_write_log("[ Order : " . $this->orderNumber . " ] This invoice has already been paid (" . $axonautInvoiceId . " - " . $axonautInvoice["paid_date"] . ").");
+                return false;
             }
+        } else if ($result['status'] === 404 || ($result['ok'] && empty($result['data']))) {
+            // Aucune facture avec ce numéro de commande : on la crée.
+            axonaut_write_log("[ Order : " . $this->orderNumber . " ] Invoice does not exist in Axonaut - Create the invoice.");
+            $axonautInvoiceId = $this->send();
+        } else {
+            return false;
         }
 
         // ======================= Nouveau paiement =======================
 
-        if (!is_null($axonautInvoiceId)) {
+        if (!empty($axonautInvoiceId)) {
             // 1 = Prélèvement ; 2 = Virement ; 3 = Chèque ; 4 = CB ; 5 = Espèce
             $woo_payment = $this->order->get_payment_method();
             if (strpos($woo_payment, "bacs") !== false) {
@@ -307,34 +264,14 @@ class AxonautSell
                 "invoice_id" => $axonautInvoiceId,
             );
 
-            $request = wp_remote_post($this->baseUrl . '/api/v2/payments', array(
-                'headers' => array(
-                    'userApiKey' => get_option('axonaut_api_key'),
-                    'Content-Type' => 'application/json',
-                    'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-                ),
-                'body' => json_encode($body),
-                'sslverify' => false,
-            ));
-
-            if (is_wp_error($request)) {
-                $error = $request->get_error_message();
-                axonaut_write_log("Something went wrong in axonaut-sell::send_pay() (2) : $error", AXONAUT_LOG_ERROR);
-
+            $result = Axonaut_Api::post('/api/v2/payments', $body);
+            if (!$result['ok']) {
                 return false;
-            } else {
-                // No WordPress error
-                $response = json_decode($request["body"], true);
-                if (!empty($response["error"])) {
-                    // Axonaut error
-                    axonaut_write_log("[ Order : " . $this->orderNumber . " ] Error when trying to post a payment : " . json_encode($response["error"]));
-
-                    return false;
-                }
-                axonaut_write_log("[ Order : " . $this->orderNumber . " ] Payment request has been successful.");
-
-                return true;
             }
+
+            axonaut_write_log("[ Order : " . $this->orderNumber . " ] Payment request has been successful.");
+
+            return true;
         }
 
         axonaut_write_log("[ Order : " . $this->orderNumber . " ] Could not retrieve Axonaut invoice id.");
@@ -351,32 +288,13 @@ class AxonautSell
     {
         axonaut_write_log("[ Order : " . $this->orderNumber . " ] Cancelling order payments...");
         
-        $request = wp_remote_request($this->baseUrl . '/api/v2/private/order-payments/'.$this->orderNumber, array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'userApiKey' => get_option('axonaut_api_key'),
-                'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-            ),
-            'method' => "DELETE",
-            'sslverify' => false,
-        ));
-
-        if (is_wp_error($request)) {
-            $error = $request->get_error_message();
-            axonaut_write_log("Something went wrong in axonaut-sell::cancel_order() (1) : $error", AXONAUT_LOG_ERROR);
+        $result = Axonaut_Api::delete('/api/v2/private/order-payments/' . $this->orderNumber);
+        if (!$result['ok']) {
             return false;
-        } else {
-            // No WordPress error
-            $response = json_decode($request["body"], true);
-            if (!empty($response["error"])) {
-                // Axonaut error
-                axonaut_write_log("[ Order : " . $this->orderNumber . " ] Error when trying to delete the payment : " . json_encode($response["error"]), AXONAUT_LOG_ERROR);
-                return false;
-            }
-
-            axonaut_write_log("[ Order : $this->orderNumber ] Payments successfully deleted.");
-
-            return true;
         }
+
+        axonaut_write_log("[ Order : $this->orderNumber ] Payments successfully deleted.");
+
+        return true;
     }
 }

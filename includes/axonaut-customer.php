@@ -10,7 +10,7 @@
  * @subpackage Axonaut/includes
  */
 
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/log.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-api.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 
 class AxonautCustomer
@@ -30,9 +30,6 @@ class AxonautCustomer
 	public $employeeLastname;
 	public $employeeEmail;
 	public $employeePhoneNumber;
-
-//    private $baseUrl = "http://localhost/axonauts4/public/index.php";
-    private $baseUrl = "https://axonaut.com";
 
 	/**
 	 * AxonautCustomer constructor
@@ -129,31 +126,13 @@ class AxonautCustomer
             "employee_phone" => "",
 	    );
 
-        $request = wp_remote_post($this->baseUrl . '/api/v2/private/company-and-employee', array(
-            'headers' => array(
-                'Content-Type' => 'application/json',
-                'userApiKey' => get_option('axonaut_api_key'),
-                'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-            ),
-            'body' => json_encode($body),
-            'sslverify' => false,
-        ));
+        $result = Axonaut_Api::post('/api/v2/private/company-and-employee', $body);
+        if (!$result['ok']) {
+            return null;
+        }
 
-	    if (is_wp_error($request)) {
-		    $error = $request->get_error_message();
-            axonaut_write_log("Something went wrong in axonaut-customer::send() (1) : $error", AXONAUT_LOG_ERROR);
-		    return null;
-	    } else {
-		    // No WordPress error
-		    $response = json_decode($request["body"], true);
-		    if (!empty($response["error"])) {
-			    // Axonaut error
-                axonaut_write_log("[ Customer : " . $this->wcCustomer->ID . " ] Error when trying to synchronize the customer : " . json_encode($response["error"]), AXONAUT_LOG_ERROR);
-			    return null;
-		    }
-            axonaut_write_log("[ Customer : " . $this->wcCustomer->ID . " ] Synchronization of the company has been successful (" . $response["company_id"] . ").");
-	    }
+        axonaut_write_log("[ Customer : " . $this->wcCustomer->ID . " ] Synchronization of the company has been successful (" . $result['data']["company_id"] . ").");
 
-	    return true;
+        return true;
     }
 }

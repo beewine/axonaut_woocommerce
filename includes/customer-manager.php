@@ -18,9 +18,6 @@ class CustomerManager
 {
     private $wordpress_customers;
 
-//    private $baseUrl = "http://localhost/axonauts4/public/index.php";
-    private $baseUrl = "https://axonaut.com";
-
     /**
      * CustomerManager constructor.
      */
@@ -137,37 +134,7 @@ class CustomerManager
 
         axonaut_write_log("Sending " . sizeof($customers) ." companies to Axonaut.");
 
-        try {
-            $request = wp_remote_post($this->baseUrl . '/api/v2/private/companies-and-employees', array(
-                'headers' => array(
-                    'Content-Type' => 'application/json',
-                    'userApiKey' => get_option('axonaut_api_key'),
-                    'X-AXONAUT-ORIGIN' => "WooCommerce " . getVersionModule(),
-                ),
-                'body' => json_encode(array("companies_and_employees" => $customers)),
-                'sslverify' => false,
-            ));
-        } catch (Exception $e) {
-            axonaut_write_log("[ Customers ] " . $e->getMessage());
-        }
-//
-//        if (is_wp_error($request)) {
-//            $error = $request->get_error_message();
-//            write_log("Something went wrong in customer-manager::synchronize() (1) : $error");
-//
-//            return null;
-//        } else {
-//            // No WordPress error
-//            $response = json_decode($request["body"], true);
-//            if (!empty($response["error"])) {
-//                // Axonaut error
-//                write_log("[ Customers ] Error when trying to synchronize customers : " . json_encode($response["error"]));
-//
-//                return null;
-//            }
-//            write_log("[ Customers ] Number of companies successfully synchronized : " . $response["count_companies"]);
-//            return $response["count_companies"];
-//        }
+        Axonaut_Api::post('/api/v2/private/companies-and-employees', array("companies_and_employees" => $customers), array('timeout' => 60));
     }
 
     /**

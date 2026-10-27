@@ -13,9 +13,9 @@
  *
  * @wordpress-plugin
  * Plugin Name:       Axonaut
- * Plugin URI:        https://axonaut.com
+ * Plugin URI:        https://github.com/beewine/axonaut_woocommerce
  * Description:       Synchronisez votre boutique WooCommerce avec Axonaut, votre CRM/ERP tout-en-un en ligne ! Clients, produits, commandes : toutes vos données générées automatiquement.
- * Version:           2.4.2
+ * Version:           2.5.0
  * Author:            Axonaut
  * Author URI:        https://axonaut.com
  * License:           GPL-2.0+
