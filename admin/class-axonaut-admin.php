@@ -13,6 +13,7 @@
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-display.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/log.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-sync-settings.php";
 
 class Axonaut_Admin
 {
@@ -157,13 +158,30 @@ class Axonaut_Admin
             // Enregistrement des configurations
             add_settings_section("configuration_section", __("Paramètres du module Axonaut", "axonaut"), [$this, "axonaut_display_header_options_content"], "axonaut_settings");
             add_settings_field("axonaut_api_key", __('Clé d\'API', "axonaut"), [$this, "axonaut_display_api_key"], "axonaut_settings", "configuration_section");
-            add_settings_field("axonaut_sync_products", __('Synchronisation des produits', "axonaut"), [$this, "axonaut_display_sync_products"], "axonaut_settings", "configuration_section");
+            $labels = array(
+                'stock' => __('Sens de synchronisation : stock', "axonaut"),
+                'name' => __('Sens de synchronisation : titre du produit', "axonaut"),
+                'description' => __('Sens de synchronisation : descriptif', "axonaut"),
+                'price' => __('Sens de synchronisation : prix HT', "axonaut"),
+            );
+            foreach (Axonaut_Sync_Settings::FIELDS as $field) {
+                add_settings_field("axonaut_dir_" . $field, $labels[$field], function () use ($field) {
+                    $this->axonaut_display_direction($field);
+                }, "axonaut_settings", "configuration_section");
+                register_setting("configuration_section", "axonaut_dir_" . $field, array('sanitize_callback' => function ($v) {
+                    return in_array($v, Axonaut_Sync_Settings::DIRECTIONS, true) ? $v : 'none';
+                }));
+            }
+            add_settings_field("axonaut_conflict_winner", __('Si les deux côtés ont changé', "axonaut"), [$this, "axonaut_display_conflict_winner"], "axonaut_settings", "configuration_section");
+            register_setting("configuration_section", "axonaut_conflict_winner", array('sanitize_callback' => function ($v) {
+                return $v === 'axonaut' ? 'axonaut' : 'woocommerce';
+            }));
             add_settings_field("axonaut_product_match", __('Rapprochement des produits', "axonaut"), [$this, "axonaut_display_product_match"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_description_source", __('Descriptif envoyé à Axonaut', "axonaut"), [$this, "axonaut_display_description_source"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_existing_customers", __('Synchronisation des clients existants', "axonaut"), [$this, "axonaut_display_sync_existing_customers"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_new_customers", __('Synchronisation des nouveaux clients', "axonaut"), [$this, "axonaut_display_sync_new_customers"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_sells", __('Synchronisation des ventes', "axonaut"), [$this, "axonaut_display_sync_sells"], "axonaut_settings", "configuration_section");
-            add_settings_field("axonaut_sync_stocks", __('Synchronisation des stocks depuis Axonaut', "axonaut"), [$this, "axonaut_display_sync_stocks"], "axonaut_settings", "configuration_section");
+            add_settings_field("axonaut_webhook_info", __('Webhook de stock Axonaut', "axonaut"), [$this, "axonaut_display_sync_stocks"], "axonaut_settings", "configuration_section");
             register_setting("configuration_section", "axonaut_api_key");
             register_setting("configuration_section", "axonaut_product_match", array('sanitize_callback' => function ($v) {
                 return $v === 'id_only' ? 'id_only' : 'sku_then_id';
@@ -172,10 +190,8 @@ class Axonaut_Admin
                 return in_array($v, array('short', 'long', 'short_then_long'), true) ? $v : 'short';
             }));
             register_setting("configuration_section", "axonaut_sync_existing_customers");
-            register_setting("configuration_section", "axonaut_sync_products");
             register_setting("configuration_section", "axonaut_sync_new_customers");
             register_setting("configuration_section", "axonaut_sync_sells");
-            register_setting("configuration_section", "axonaut_sync_stocks");
         } else if ($tab == "synchro") {
             add_settings_section("axonaut_synchro_section", __("Synchronisation des données WooCommerce > Axonaut", "axonaut"), [$this, "axonaut_display_axo_synchro_content"], "axonaut_settings");
             add_settings_field("axonaut_last_sync_date", __("Dernière synchronisation", "axonaut"), [$this, "axonaut_display_last_sync_date"], "axonaut_settings", "axonaut_synchro_section");
@@ -197,6 +213,41 @@ class Axonaut_Admin
         <input style="width: 380px;" type="text" name="axonaut_api_key" id="axonaut_api_key"
                value="<?php echo esc_attr(get_option('axonaut_api_key')); ?>"/>
         <?php
+    }
+
+    /**
+     * Sens de synchronisation d'un champ
+     */
+    public function axonaut_display_direction($field)
+    {
+        $value = Axonaut_Sync_Settings::direction($field);
+        $options = array(
+            'none' => __("Ne pas synchroniser", "axonaut"),
+            'to_axonaut' => __("WooCommerce vers Axonaut", "axonaut"),
+            'from_axonaut' => __("Axonaut vers WooCommerce", "axonaut"),
+            'both' => __("Dans les deux sens", "axonaut"),
+        );
+        echo "<select name='axonaut_dir_" . esc_attr($field) . "' id='axonaut_dir_" . esc_attr($field) . "'>";
+        foreach ($options as $key => $label) {
+            echo "<option value='" . esc_attr($key) . "'" . selected($value, $key, false) . ">" . esc_html($label) . "</option>";
+        }
+        echo "</select>";
+        if ($field === 'stock') {
+            echo "<p class='description'>" . esc_html__("Axonaut vers WooCommerce ou dans les deux sens : nécessite le webhook décrit ci-dessous. Le stock est envoyé à Axonaut 30 secondes après un changement.", "axonaut") . "</p>";
+        }
+    }
+
+    /**
+     * Qui l'emporte quand un champ a été modifié des deux côtés
+     */
+    public function axonaut_display_conflict_winner()
+    {
+        $value = Axonaut_Sync_Settings::conflict_winner();
+        echo "<select name='axonaut_conflict_winner' id='axonaut_conflict_winner'>";
+        echo "<option value='woocommerce'" . selected($value, 'woocommerce', false) . ">" . esc_html__("WooCommerce l'emporte", "axonaut") . "</option>";
+        echo "<option value='axonaut'" . selected($value, 'axonaut', false) . ">" . esc_html__("Axonaut l'emporte", "axonaut") . "</option>";
+        echo "</select>";
+        echo "<p class='description'>" . esc_html__("S'applique aux champs synchronisés dans les deux sens.", "axonaut") . "</p>";
     }
 
     /**
@@ -230,12 +281,11 @@ class Axonaut_Admin
      */
     public function axonaut_display_sync_stocks()
     {
-        echo AxonautDisplay::create_switch("axonaut_sync_stocks");
-        echo "<input id='axonaut_sync_stocks_url' type='text' style='margin-left: 20px; margin-right: 20px; width: 380px;' readonly='readonly' value='".get_bloginfo('url')."/wp-json/axonaut/v3/stocklog-created'/>";
+        echo "<input id='axonaut_sync_stocks_url' type='text' style='margin-right: 20px; width: 380px;' readonly='readonly' value='" . esc_url(rest_url('axonaut/v3/stocklog-created')) . "'/>";
         echo "<div id='axonaut_sync_stocks_url_cpy_button' style='border: 1px solid #000; padding: 3px; display: inline-block;'><i class='dashicons dashicons-editor-paste-text'></i></div>";
         echo "<br/><br/>" . __("Secret du webhook (à ajouter dans Axonaut, en-tête <code>X-Axonaut-Secret</code>) :", "axonaut") . "<br/>";
         echo "<input type='text' style='width: 380px;' readonly='readonly' value='" . esc_attr(axonaut_get_webhook_secret()) . "'/>";
-        echo __("<br/><br/><b>Important</b> : les stocks sont synchronisés depuis Axonaut, Axonaut est maître des informations de stock.<br/>", "axonaut");
+        echo "<br/><br/>" . __("À déclarer dans Axonaut (API, Webhooks, topic <code>stockLog.created</code>) pour recevoir les stocks.", "axonaut");
         echo "<script>
         document.getElementById('axonaut_sync_stocks_url_cpy_button').addEventListener('click', () => {
                 navigator.clipboard.writeText(document.getElementById('axonaut_sync_stocks_url').value).then(() => {
@@ -270,21 +320,13 @@ class Axonaut_Admin
     }
 
     /**
-     * GUI switch to allow product synchronize
-     */
-    public function axonaut_display_sync_products()
-    {
-        echo AxonautDisplay::create_switch("axonaut_sync_products");
-    }
-
-    /**
      * GUI label for guide the user
      */
     public function axonaut_display_header_options_content()
     {
         echo __("<b>Configuration du module :</b>
         <br/>- La <b>clé API</b> se trouve sur <a href='https://axonaut.com/utilities/api' target='_blank'>votre section API sur Axonaut</a>. <b>Attention</b> : assurez vous que l'utilisateur correspondant à cette clé possède le rôle <b>\"Administrateur\"</b> sur Axonaut !
-        <br/>- <b>Synchronisation des produits</b> : vos produits seront mis à jour dans Axonaut (nom, prix, taxe, description, quantité, ...).
+        <br/>- <b>Sens de synchronisation</b> : pour le stock, le titre, le descriptif et le prix, choisissez de WooCommerce vers Axonaut, d'Axonaut vers WooCommerce, ou dans les deux sens.
         <br/>- <b>Synchronisation des nouveaux clients</b> : les utilisateurs qui s'inscrivent à votre boutique et/ou passent une commande seront créés dans Axonaut et identifiés grâce à leur adresse email.
         <br/>- <b>Synchronisation des ventes</b> : les commandes passées à \"En cours\" généreront des factures, et les commandes passées à \"Terminée\" généreront le paiement correspondant dans Axonaut.");
     }
@@ -385,7 +427,7 @@ class Axonaut_Admin
             $customer_manager->synchronize();
             $customer_manager->dump();
         }
-        if (get_option('axonaut_sync_products') == "on") {
+        if (!empty(Axonaut_Sync_Settings::pushed_fields())) {
             $product_manager = new ProductManager();
             $product_manager->synchronize();
             if (get_option('axonaut_sync_existing_customers') == "on") {

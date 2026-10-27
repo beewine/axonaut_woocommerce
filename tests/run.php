@@ -6,6 +6,11 @@ require $root . '/includes/class-axonaut-api.php';
 require $root . '/includes/class-axonaut-webhooks.php';
 require_once $root . '/includes/class-axonaut-product-mapper.php';
 require_once $root . '/includes/class-axonaut-product-resolver.php';
+require_once $root . '/includes/class-axonaut-sync-settings.php';
+require_once $root . '/includes/class-axonaut-snapshot.php';
+require_once $root . '/includes/class-axonaut-merge.php';
+require_once $root . '/includes/class-axonaut-queue.php';
+require_once $root . '/includes/class-axonaut-stock-sync.php';
 
 echo "Axonaut_Api\n";
 $GLOBALS['axo_http_queue'][] = array('code' => 200, 'body' => '[{"id":7}]');
@@ -103,6 +108,63 @@ check('par ID WooCommerce', Axonaut_Product_Resolver::find_wc_product('300', '')
 check('par UGS quand internal_id absent', Axonaut_Product_Resolver::find_wc_product('', 'SKU-300')->get_id() === 300);
 check('internal_id non numérique : repli sur l\'UGS', Axonaut_Product_Resolver::find_wc_product('REF#9', 'SKU-300')->get_id() === 300);
 check('inconnu => null', Axonaut_Product_Resolver::find_wc_product('4040', 'NOPE') === null);
+
+echo "Axonaut_Sync_Settings\n";
+$GLOBALS['axo_options'] = array('axonaut_api_key' => 'KEY');
+check('défaut historique : rien d\'activé => none', Axonaut_Sync_Settings::direction('stock') === 'none' && Axonaut_Sync_Settings::direction('name') === 'none');
+$GLOBALS['axo_options']['axonaut_sync_stocks'] = 'on';
+$GLOBALS['axo_options']['axonaut_sync_products'] = 'on';
+check('défaut historique : stock depuis Axonaut', Axonaut_Sync_Settings::direction('stock') === 'from_axonaut' && Axonaut_Sync_Settings::pulls('stock') && !Axonaut_Sync_Settings::pushes('stock'));
+check('défaut historique : produits vers Axonaut', Axonaut_Sync_Settings::direction('price') === 'to_axonaut');
+$GLOBALS['axo_options']['axonaut_dir_stock'] = 'both';
+check('réglage enregistré prioritaire', Axonaut_Sync_Settings::pushes('stock') && Axonaut_Sync_Settings::pulls('stock'));
+$GLOBALS['axo_options']['axonaut_dir_name'] = 'valeur-invalide';
+check('valeur invalide ignorée', Axonaut_Sync_Settings::direction('name') === 'to_axonaut');
+check('garde anti-écho', !Axonaut_Sync_Settings::is_inbound() && Axonaut_Sync_Settings::as_inbound(function () { return Axonaut_Sync_Settings::is_inbound(); }) === true && !Axonaut_Sync_Settings::is_inbound());
+
+echo "Axonaut_Merge (comparaison à trois voies)\n";
+$m = function ($dir, $wc, $remote, $snap, $win = 'woocommerce') { return Axonaut_Merge::decide($dir, $wc, $remote, $snap, $win); };
+check('valeurs égales => rien', $m('both', 'a', 'a', 'x') === 'none');
+check('none => rien', $m('none', 'a', 'b', null) === 'none');
+check('to_axonaut => envoie', $m('to_axonaut', 'a', 'b', 'b') === 'to_axonaut');
+check('from_axonaut => importe', $m('from_axonaut', 'a', 'b', 'a') === 'to_woocommerce');
+check('both : seul WooCommerce a changé', $m('both', 'new', 'old', 'old') === 'to_axonaut');
+check('both : seul Axonaut a changé', $m('both', 'old', 'new', 'old') === 'to_woocommerce');
+check('both : conflit, WooCommerce l\'emporte', $m('both', 'wc', 'ax', 'old', 'woocommerce') === 'to_axonaut');
+check('both : conflit, Axonaut l\'emporte', $m('both', 'wc', 'ax', 'old', 'axonaut') === 'to_woocommerce');
+check('both : pas d\'instantané => arbitrage par le gagnant', $m('both', 'wc', 'ax', null, 'axonaut') === 'to_woocommerce');
+
+echo "Axonaut_Stock_Sync\n";
+Axonaut_Product_Resolver::reset_cache();
+$GLOBALS['axo_options'] = array('axonaut_api_key' => 'KEY', 'axonaut_dir_stock' => 'both', 'axonaut_product_match' => 'id_only');
+$GLOBALS['axo_http'] = array();
+$sp = new FakeProduct(array('id' => 500, 'sku' => 'S-500', 'manage' => true, 'qty' => 7));
+$GLOBALS['axo_http_queue'] = array(
+    array('code' => 200, 'body' => json_encode(array(array('id' => 61, 'internal_id' => '500', 'product_code' => 'S-500')))),
+    array('code' => 200, 'body' => '{}'),
+);
+check('push stock : succès', Axonaut_Stock_Sync::push($sp) === true);
+$last = end($GLOBALS['axo_http']);
+check('PATCH /products/{id}/stock avec la valeur absolue', $last['args']['method'] === 'PATCH' && substr($last['url'], -18) === '/products/61/stock' && strpos($last['args']['body'], '"stock":7') !== false);
+$n = count($GLOBALS['axo_http']);
+Axonaut_Stock_Sync::push($sp);
+check('stock inchangé depuis l\'instantané : aucun appel', count($GLOBALS['axo_http']) === $n);
+$sp->d['qty'] = 5;
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => '{}'));
+Axonaut_Product_Resolver::reset_cache();
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => json_encode(array(array('id' => 61, 'internal_id' => '500')))), array('code' => 200, 'body' => '{}'));
+Axonaut_Stock_Sync::push($sp);
+check('stock modifié : nouvel envoi', count($GLOBALS['axo_http']) === $n + 2);
+Axonaut_Stock_Sync::apply_inbound($sp, 12);
+check('entrant : stock appliqué et instantané mis à jour', $sp->d['qty'] === 12 && Axonaut_Snapshot::get($sp)['stock'] === '12');
+$n = count($GLOBALS['axo_http']);
+Axonaut_Stock_Sync::push($sp);
+check('anti-écho : le stock reçu n\'est pas renvoyé', count($GLOBALS['axo_http']) === $n);
+
+echo "Axonaut_Queue\n";
+Axonaut_Queue::enqueue_stock(500, 30);
+Axonaut_Queue::enqueue_stock(500, 30);
+check('une seule tâche en attente par produit', count($GLOBALS['axo_as']) === 1);
 
 echo $GLOBALS['axo_fail'] ? "\n{$GLOBALS['axo_fail']} échec(s)\n" : "\nTout est vert\n";
 exit($GLOBALS['axo_fail'] ? 1 : 0);

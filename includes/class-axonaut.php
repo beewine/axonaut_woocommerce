@@ -189,6 +189,14 @@ class Axonaut
         $this->loader->add_action('woocommerce_order_status_cancelled', $plugin_public, 'hook_cancel_order');
         $this->loader->add_action('user_register', $plugin_public, 'hook_register');
         $this->loader->add_action(Axonaut_Queue::HOOK_PRODUCT, 'Axonaut_Product_Sync', 'run');
+        $this->loader->add_action(Axonaut_Queue::HOOK_STOCK, 'Axonaut_Stock_Sync', 'run');
+        // Temps réel : sauvegarde d'un produit ou d'une variation, changement de stock.
+        $this->loader->add_action('woocommerce_new_product', 'Axonaut_Product_Sync', 'on_product_saved');
+        $this->loader->add_action('woocommerce_update_product', 'Axonaut_Product_Sync', 'on_product_saved');
+        $this->loader->add_action('woocommerce_new_product_variation', 'Axonaut_Product_Sync', 'on_product_saved');
+        $this->loader->add_action('woocommerce_update_product_variation', 'Axonaut_Product_Sync', 'on_product_saved');
+        $this->loader->add_action('woocommerce_product_set_stock', 'Axonaut_Stock_Sync', 'on_stock_changed');
+        $this->loader->add_action('woocommerce_variation_set_stock', 'Axonaut_Stock_Sync', 'on_stock_changed');
     }
 
     /**
