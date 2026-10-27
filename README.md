@@ -57,6 +57,8 @@ une mise en production :
    décompte, à confirmer en mode « dans les deux sens ».
 4. Limite de débit de l'API : la file d'attente espace les produits de 2 s et réessaie après un 429.
 
+Le déroulé des essais est dans [docs/protocole-test-compte-reel.md](docs/protocole-test-compte-reel.md).
+
 ## Changements de comportement par rapport à 2.4.2
 
 - La route du webhook de stock exige un secret ou une clé WooCommerce (elle était ouverte à tous).
