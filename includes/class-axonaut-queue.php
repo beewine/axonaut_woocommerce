@@ -14,29 +14,40 @@ class Axonaut_Queue
 {
     const GROUP = 'axonaut';
     const HOOK_PRODUCT = 'axonaut_sync_product';
+    const HOOK_STOCK = 'axonaut_sync_stock';
 
-    /**
-     * Planifie la synchronisation d'un produit (sans doublon déjà en attente).
-     *
-     * @param int $productId
-     * @param int $delay secondes avant exécution
-     * @return bool planifié ou déjà planifié
-     */
     public static function enqueue_product($productId, $delay = 0)
     {
-        $args = array((int) $productId);
+        return self::enqueue(self::HOOK_PRODUCT, array((int) $productId), $delay);
+    }
+
+    public static function enqueue_stock($productId, $delay = 0)
+    {
+        return self::enqueue(self::HOOK_STOCK, array((int) $productId), $delay);
+    }
+
+    /**
+     * Planifie une tâche (sans doublon déjà en attente).
+     *
+     * @param string $hook
+     * @param array  $args
+     * @param int    $delay secondes avant exécution
+     * @return bool planifiée ou déjà planifiée
+     */
+    public static function enqueue($hook, array $args, $delay = 0)
+    {
         $when = time() + max(0, (int) $delay);
 
         if (function_exists('as_schedule_single_action') && function_exists('as_has_scheduled_action')) {
-            if (as_has_scheduled_action(self::HOOK_PRODUCT, $args, self::GROUP)) {
+            if (as_has_scheduled_action($hook, $args, self::GROUP)) {
                 return true;
             }
-            return as_schedule_single_action($when, self::HOOK_PRODUCT, $args, self::GROUP) > 0;
+            return as_schedule_single_action($when, $hook, $args, self::GROUP) > 0;
         }
 
-        if (wp_next_scheduled(self::HOOK_PRODUCT, $args)) {
+        if (wp_next_scheduled($hook, $args)) {
             return true;
         }
-        return false !== wp_schedule_single_event($when + 1, self::HOOK_PRODUCT, $args);
+        return false !== wp_schedule_single_event($when + 1, $hook, $args);
     }
 }

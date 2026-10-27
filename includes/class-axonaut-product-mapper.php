@@ -114,16 +114,38 @@ class Axonaut_Product_Mapper
     /**
      * Données envoyées à Axonaut pour créer ou mettre à jour le produit.
      * Seuls les champs documentés de l'API produit sont envoyés.
+     *
+     * @param WC_Product        $product
+     * @param array|null        $fields  sous-ensemble de name, description, price ; null = tous
      */
-    public static function payload($product)
+    public static function payload($product, $fields = null)
     {
-        return array(
-            'name' => self::name($product),
-            'description' => self::description($product),
+        $fields = $fields === null ? array('name', 'description', 'price') : $fields;
+
+        $body = array(
             'internal_id' => (string) $product->get_id(),
             'product_code' => self::sku($product),
-            'price' => round((float) self::price_excl_tax($product), 4),
-            'tax_rate' => self::tax_rate($product),
+        );
+        if (in_array('name', $fields, true)) {
+            $body['name'] = self::name($product);
+        }
+        if (in_array('description', $fields, true)) {
+            $body['description'] = self::description($product);
+        }
+        if (in_array('price', $fields, true)) {
+            $body['price'] = round((float) self::price_excl_tax($product), 4);
+            $body['tax_rate'] = self::tax_rate($product);
+        }
+        return $body;
+    }
+
+    /** Valeurs normalisées des champs, pour l'instantané de synchronisation. */
+    public static function values($product)
+    {
+        return array(
+            'name' => Axonaut_Snapshot::normalize('name', self::name($product)),
+            'description' => Axonaut_Snapshot::normalize('description', self::description($product)),
+            'price' => Axonaut_Snapshot::normalize('price', self::price_excl_tax($product)),
         );
     }
 }

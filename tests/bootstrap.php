@@ -63,4 +63,18 @@ class FakeProduct {
     // Sur une variation, get_description() est la description de la variation ; sinon la description longue.
     function get_description() { return $this->d['type'] === 'variation' ? $this->d['desc'] : $this->d['long']; }
     function get_short_description() { return $this->d['short']; }
+    function managing_stock() { return !empty($this->d['manage']); }
+    function get_stock_quantity() { return array_key_exists('qty', $this->d) ? $this->d['qty'] : null; }
+    function get_meta($k, $single = true) { return isset($this->d['meta'][$k]) ? $this->d['meta'][$k] : ''; }
+    function update_meta_data($k, $v) { $this->d['meta'][$k] = $v; }
+    function save_meta_data() {}
+    function set_manage_stock($v) { $this->d['manage'] = $v; }
+    function set_stock_quantity($v) { $this->d['qty'] = $v; }
+    function set_stock_status($v) { $this->d['stock_status'] = $v; }
+    function save() { $this->d['saved'] = true; }
 }
+
+// Action Scheduler simulé
+$GLOBALS['axo_as'] = array();
+function as_has_scheduled_action($hook, $args, $group) { return isset($GLOBALS['axo_as'][md5($hook . json_encode($args))]); }
+function as_schedule_single_action($when, $hook, $args, $group) { $GLOBALS['axo_as'][md5($hook . json_encode($args))] = $when; return 1; }
