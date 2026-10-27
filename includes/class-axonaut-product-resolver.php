@@ -45,7 +45,7 @@ class Axonaut_Product_Resolver
     public static function find_remote($product, $link = true)
     {
         $wcId = $product->get_id();
-        if (array_key_exists($wcId, self::$cache)) {
+        if (isset(self::$cache[$wcId])) {
             return self::$cache[$wcId];
         }
 
@@ -67,7 +67,20 @@ class Axonaut_Product_Resolver
             }
         }
 
-        return self::$cache[$wcId] = $remote;
+        // Seuls les produits trouvés sont mémorisés : un produit introuvable peut être créé juste après,
+        // dans la même exécution (Action Scheduler enchaîne plusieurs tâches par requête).
+        if ($remote !== null) {
+            self::$cache[$wcId] = $remote;
+        }
+        return $remote;
+    }
+
+    /** Mémorise le produit Axonaut qui vient d'être créé pour ce produit WooCommerce. */
+    public static function remember($product, $remote)
+    {
+        if (is_array($remote) && !empty($remote['id'])) {
+            self::$cache[$product->get_id()] = $remote;
+        }
     }
 
     public static function find_by_internal_id($wcId)

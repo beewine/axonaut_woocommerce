@@ -107,6 +107,24 @@ Axonaut_Product_Resolver::find_remote($wc);
 check('mode id_only : aucune recherche par référence', count($GLOBALS['axo_http']) === 1 && strpos($GLOBALS['axo_http'][0]['url'], 'internal_id=77') !== false);
 $GLOBALS['axo_options']['axonaut_product_match'] = 'sku_then_id';
 
+echo "Pas de doublon de produit dans une même exécution\n";
+Axonaut_Product_Resolver::reset_cache();
+$GLOBALS['axo_options']['axonaut_product_match'] = 'id_only';
+$GLOBALS['axo_options']['axonaut_dir_name'] = 'to_axonaut';
+$dup = new FakeProduct(array('id' => 88, 'sku' => 'DUP-1', 'name' => 'Doublon', 'price' => 4.0, 'manage' => true, 'qty' => 3));
+$GLOBALS['axo_http'] = array();
+$GLOBALS['axo_http_queue'] = array(
+    array('code' => 200, 'body' => '[]'),                                       // recherche : inconnu
+    array('code' => 200, 'body' => json_encode(array('id' => 500, 'internal_id' => '88'))), // création
+);
+require_once $root . '/includes/class-axonaut-product-sync.php';
+Axonaut_Product_Sync::push($dup);
+$created = count(array_filter($GLOBALS['axo_http'], function ($h) { return $h['args']['method'] === 'POST'; }));
+check('produit créé une fois', $created === 1);
+$remote = Axonaut_Product_Resolver::find_remote($dup, false);
+check('le produit créé est retrouvé sans nouvelle requête', $remote !== null && $remote['id'] === 500 && count($GLOBALS['axo_http']) === 2);
+$GLOBALS['axo_options']['axonaut_product_match'] = 'sku_then_id';
+
 echo "find_wc_product (webhook de stock)\n";
 $GLOBALS['axo_wc_products'][300] = new FakeProduct(array('id' => 300, 'sku' => 'SKU-300'));
 check('par ID WooCommerce', Axonaut_Product_Resolver::find_wc_product('300', '')->get_id() === 300);

@@ -68,6 +68,7 @@ une mise en production :
 ## Développement
 
 ```bash
+tests/integration/run.sh   # WordPress + WooCommerce jetables (Docker), API Axonaut simulée
 php tests/run.php          # tests sans WordPress
 for f in $(git ls-files '*.php'); do php -l "$f"; done
 ```

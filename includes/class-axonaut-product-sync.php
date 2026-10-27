@@ -86,6 +86,9 @@ class Axonaut_Product_Sync
         if (!$result['ok']) {
             return false;
         }
+        if ($action === 'created') {
+            Axonaut_Product_Resolver::remember($product, $result['data']);
+        }
 
         $values = Axonaut_Product_Mapper::values($product);
         if (isset($body['stock'])) {
