@@ -8,6 +8,7 @@
  * @subpackage Axonaut/includes
  */
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-stock.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-product-resolver.php";
 
 class Axonaut_Webhooks
 {
@@ -66,19 +67,20 @@ class Axonaut_Webhooks
             return new WP_REST_Response($stockLog->get_error_message(), 400);
         }
 
-        self::update_stock($stockLog->internal_id, $stockLog->current_stock);
+        $product = Axonaut_Product_Resolver::find_wc_product($stockLog->internal_id, $stockLog->product_code);
+        if (!$product) {
+            return new WP_REST_Response("product_not_found", 404);
+        }
+        self::update_stock($product, $stockLog->current_stock);
 
         return new WP_REST_Response([], 200);
     }
 
-    private static function update_stock($productId, $stock)
+    private static function update_stock($product, $stock)
     {
-        $product = wc_get_product($productId);
-        if ($product) {
-            $product->set_manage_stock(true);
-            $product->set_stock_quantity($stock);
-            $product->set_stock_status($stock > 0 ? 'instock' : 'outofstock');
-            $product->save();
-        }
+        $product->set_manage_stock(true);
+        $product->set_stock_quantity($stock);
+        $product->set_stock_status($stock > 0 ? 'instock' : 'outofstock');
+        $product->save();
     }
 }

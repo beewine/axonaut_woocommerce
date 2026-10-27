@@ -44,3 +44,23 @@ function check($label, $cond) {
     echo ($cond ? "  ok   " : "  FAIL ") . $label . "\n";
     if (!$cond) { $GLOBALS['axo_fail']++; }
 }
+
+function wp_remote_retrieve_header($r, $h) { return isset($r['headers'][$h]) ? $r['headers'][$h] : ''; }
+function wp_strip_all_tags($s) { return trim(strip_tags($s)); }
+function wc_get_product($id) { return isset($GLOBALS['axo_wc_products'][$id]) ? $GLOBALS['axo_wc_products'][$id] : false; }
+function wc_get_product_id_by_sku($sku) { foreach ($GLOBALS['axo_wc_products'] as $id => $p) { if ($p->get_sku() === $sku) { return $id; } } return 0; }
+$GLOBALS['axo_wc_products'] = array();
+
+class FakeProduct {
+    public $d;
+    function __construct($d) { $this->d = $d + array('type' => 'simple', 'sku' => '', 'short' => '', 'long' => '', 'desc' => '', 'name' => 'Produit', 'parent' => 0, 'status' => 'publish'); }
+    function get_id() { return $this->d['id']; }
+    function get_sku() { return $this->d['sku']; }
+    function get_name() { return $this->d['name']; }
+    function get_status() { return $this->d['status']; }
+    function get_parent_id() { return $this->d['parent']; }
+    function is_type($t) { return $this->d['type'] === $t; }
+    // Sur une variation, get_description() est la description de la variation ; sinon la description longue.
+    function get_description() { return $this->d['type'] === 'variation' ? $this->d['desc'] : $this->d['long']; }
+    function get_short_description() { return $this->d['short']; }
+}
