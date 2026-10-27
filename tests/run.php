@@ -12,6 +12,10 @@ require_once $root . '/includes/class-axonaut-merge.php';
 require_once $root . '/includes/class-axonaut-queue.php';
 require_once $root . '/includes/class-axonaut-stock-sync.php';
 require_once $root . '/includes/class-axonaut-product-import.php';
+require_once $root . '/includes/class-axonaut-rounding.php';
+require_once $root . '/includes/class-axonaut-tax.php';
+require_once $root . '/includes/axonaut-sell.php';
+require_once $root . '/includes/class-axonaut-order-sync.php';
 
 echo "Axonaut_Api\n";
 $GLOBALS['axo_http_queue'][] = array('code' => 200, 'body' => '[{"id":7}]');
@@ -207,6 +211,103 @@ $GLOBALS['axo_http'] = array();
 $GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => '{}'));
 Axonaut_Product_Import::import_one(array('id' => 92, 'internal_id' => '', 'product_code' => 'LINK-1', 'name' => 'Lié', 'price' => 5.0));
 check('produit Axonaut sans internal_id lié par sa référence', count($GLOBALS['axo_http']) === 1 && strpos($GLOBALS['axo_http'][0]['args']['body'], '"internal_id":"701"') !== false);
+
+echo "Axonaut_Rounding\n";
+$lines = array(array('price' => 3.3333, 'quantity' => 3, 'tax_rate' => 20), array('price' => 4.17, 'quantity' => 1, 'tax_rate' => 5.5));
+$exp = Axonaut_Rounding::expected($lines);
+check('totaux attendus par taux', $exp['ht'] === 14.17 && $exp['tax'] === round(10.00 * 0.2, 2) + round(4.17 * 0.055, 2) && $exp['total'] === round(14.17 + $exp['tax'], 2));
+check('aucun écart => pas d\'ajustement', Axonaut_Rounding::adjustment($lines, $exp['total']) === null);
+$adj = Axonaut_Rounding::adjustment($lines, $exp['total'] + 0.02);
+$lines2 = array_merge($lines, array($adj));
+check('écart de 2 centimes corrigé exactement', $adj !== null && Axonaut_Rounding::expected($lines2)['total'] === round($exp['total'] + 0.02, 2));
+$adjNeg = Axonaut_Rounding::adjustment($lines, $exp['total'] - 0.01);
+check('écart négatif corrigé', $adjNeg !== null && Axonaut_Rounding::expected(array_merge($lines, array($adjNeg)))['total'] === round($exp['total'] - 0.01, 2));
+check('écart trop grand : pas un arrondi, pas d\'ajustement', Axonaut_Rounding::adjustment($lines, $exp['total'] + 1.5) === null);
+check('cohérence facture : total TTC', Axonaut_Rounding::matches_invoice(array('total' => 100.0, 'tax_amount' => 16.67), 100.0));
+check('cohérence facture : HT + TVA', Axonaut_Rounding::matches_invoice(array('total' => 83.33, 'tax_amount' => 16.67), 100.0));
+check('incohérence détectée', !Axonaut_Rounding::matches_invoice(array('total' => 99.5, 'tax_amount' => 16.5), 100.0));
+
+echo "Axonaut_Tax\n";
+WC_Tax::$rates = array(7 => '20.0000', 8 => '5.5000');
+check('taux exact lu depuis WooCommerce', Axonaut_Tax::item_rate(new FakeItem(array('total' => 10, 'tax' => 0.55, 'taxes' => array('total' => array(8 => 0.55))))) === 5.5);
+check('taux inconnu : repli sur le ratio', Axonaut_Tax::item_rate(new FakeItem(array('total' => 10, 'tax' => 2.0, 'taxes' => array('total' => array(99 => 2.0))))) === 20.0);
+check('sans taxe : 0', Axonaut_Tax::item_rate(new FakeItem(array('total' => 10, 'tax' => 0))) === 0.0);
+
+class TestSell extends AxonautSell { protected function sync_customer() {} }
+class TestOrderSync extends Axonaut_Order_Sync { protected static function make_sell($order) { return new TestSell($order); } }
+echo "AxonautSell : facture idempotente et avoirs\n";
+$GLOBALS['axo_options'] = array('axonaut_api_key' => 'KEY', 'axonaut_product_match' => 'id_only', 'axonaut_sync_sells' => 'on', 'axonaut_sync_credit_notes' => 'on');
+Axonaut_Product_Resolver::reset_cache();
+$prod = new FakeProduct(array('id' => 31, 'sku' => 'VIN-31', 'name' => 'Vin rouge', 'short' => 'Bouteille'));
+$order = new FakeOrder(array('id' => 900, 'total' => 12.0, 'items' => array(new FakeItem(array('qty' => 2, 'total' => 10.0, 'tax' => 2.0, 'taxes' => array('total' => array(7 => 2.0)), 'product' => $prod)))));
+$GLOBALS['axo_orders'][900] = $order;
+$sell = new TestSell($order);
+
+$GLOBALS['axo_http'] = array();
+$GLOBALS['axo_http_queue'] = array(
+    array('code' => 200, 'body' => '[]'),                                                       // recherche internal_ref
+    array('code' => 200, 'body' => json_encode(array('id' => 4001, 'total' => 12.0, 'tax_amount' => 2.0, 'company' => array('id' => 77)))),
+);
+$id = $sell->send();
+$post = end($GLOBALS['axo_http']);
+$sent = json_decode($post['args']['body'], true);
+check('facture créée, id mémorisé sur la commande', $id === 4001 && $order->get_meta('_axonaut_invoice_id') === 4001 && $order->get_meta('_axonaut_company_id') === 77);
+check('ligne : référence, taux exact, prix unitaire', $sent['products'][0]['product_code'] === 'VIN-31' && $sent['products'][0]['internal_id'] === '31' && $sent['products'][0]['tax_rate'] == 20 && $sent['products'][0]['price'] == 5 && $sent['products'][0]['quantity'] == 2);
+check('totaux cohérents : pas de note', empty($order->d['notes']));
+
+// 2e appel : aucune création (idempotence), la facture est relue par son id
+$GLOBALS['axo_http'] = array();
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => json_encode(array('id' => 4001, 'total' => 12.0))));
+check('deuxième envoi : même facture, aucune création', $sell->send() === 4001 && count($GLOBALS['axo_http']) === 1 && $GLOBALS['axo_http'][0]['args']['method'] === 'GET');
+
+// remboursement partiel de 1 unité
+$refund = new FakeOrder(array('id' => 901, 'amount' => 6.0, 'items' => array(new FakeItem(array('qty' => -1, 'total' => -5.0, 'tax' => -1.0, 'taxes' => array('total' => array(7 => -1.0)), 'product' => $prod)))));
+$GLOBALS['axo_http'] = array();
+$GLOBALS['axo_http_queue'] = array(
+    array('code' => 200, 'body' => json_encode(array('id' => 4001, 'total' => 12.0))),
+    array('code' => 200, 'body' => json_encode(array('id' => 4002))),
+);
+$credit = $sell->send_credit_note($refund);
+$sent = json_decode(end($GLOBALS['axo_http'])['args']['body'], true);
+check('avoir créé', $credit === 4002 && $refund->get_meta('_axonaut_credit_note_id') === 4002);
+check('avoir : quantité négative, prix positif, facture d\'origine', $sent['products'][0]['quantity'] == -1 && $sent['products'][0]['price'] == 5 && $sent['origin_invoice_id'] === 4001 && $sent['company_id'] === 77);
+$GLOBALS['axo_http'] = array();
+check('avoir déjà créé : ignoré', $sell->send_credit_note($refund) === null && count($GLOBALS['axo_http']) === 0);
+
+// remboursement sans ligne (montant libre)
+$free = new FakeOrder(array('id' => 902, 'amount' => 3.0, 'reason' => 'Geste commercial'));
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => json_encode(array('id' => 4001, 'total' => 12.0))), array('code' => 200, 'body' => json_encode(array('id' => 4003))));
+$sell->send_credit_note($free);
+$sent = json_decode(end($GLOBALS['axo_http'])['args']['body'], true);
+check('montant libre : une ligne « Remboursement »', $sent['products'][0]['internal_id'] === '411999' && $sent['products'][0]['quantity'] == -1 && $sent['products'][0]['price'] == 3);
+
+// écart de total signalé en note de commande
+$order2 = new FakeOrder(array('id' => 910, 'total' => 12.0, 'items' => array(new FakeItem(array('qty' => 1, 'total' => 10.0, 'tax' => 2.0, 'taxes' => array('total' => array(7 => 2.0)), 'product' => $prod)))));
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => '[]'), array('code' => 200, 'body' => json_encode(array('id' => 5001, 'total' => 11.99, 'tax_amount' => 1.99))));
+(new TestSell($order2))->send();
+check('écart de total : note sur la commande', count($order2->d['notes']) === 1);
+
+echo "Axonaut_Order_Sync (verrou et nouvelles tentatives)\n";
+$GLOBALS['axo_as'] = array();
+Axonaut_Order_Sync::on_processing(900);
+Axonaut_Order_Sync::on_processing(900);
+check('une seule tâche par commande et action', count($GLOBALS['axo_as']) === 1);
+$GLOBALS['axo_as'] = array();
+$GLOBALS['axo_http'] = array();
+$GLOBALS['axo_http_queue'] = array(array('code' => 500, 'body' => '{"error":"x"}'));   // la facture échoue (aucune facture mémorisée)
+$orderRetry = new FakeOrder(array('id' => 920, 'total' => 12.0, 'items' => array(new FakeItem(array('qty' => 1, 'total' => 10.0, 'tax' => 2.0, 'taxes' => array('total' => array(7 => 2.0)), 'product' => $prod)))));
+$GLOBALS['axo_orders'][920] = $orderRetry;
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => '[]'), array('code' => 500, 'body' => '{"error":"down"}'));
+TestOrderSync::run(920, 'invoice', 0, 1);
+check('échec : nouvelle tentative planifiée', count($GLOBALS['axo_as']) === 1);
+$GLOBALS['axo_as'] = array();
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => '[]'), array('code' => 500, 'body' => '{"error":"down"}'));
+TestOrderSync::run(920, 'invoice', 0, 4);
+check('4e échec : note de commande, plus de tentative', count($GLOBALS['axo_as']) === 0 && count($orderRetry->d['notes']) === 1);
+check('verrou libéré après exécution', !array_key_exists('axonaut_lock_920', $GLOBALS['axo_options']));
+$GLOBALS['axo_options']['axonaut_lock_920'] = time();
+TestOrderSync::run(920, 'invoice', 0, 1);
+check('verrou actif : la tâche est replanifiée sans rien envoyer', count($GLOBALS['axo_as']) === 1);
 
 echo $GLOBALS['axo_fail'] ? "\n{$GLOBALS['axo_fail']} échec(s)\n" : "\nTout est vert\n";
 exit($GLOBALS['axo_fail'] ? 1 : 0);

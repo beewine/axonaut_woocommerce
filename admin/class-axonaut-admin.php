@@ -182,6 +182,8 @@ class Axonaut_Admin
             add_settings_field("axonaut_sync_existing_customers", __('Synchronisation des clients existants', "axonaut"), [$this, "axonaut_display_sync_existing_customers"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_new_customers", __('Synchronisation des nouveaux clients', "axonaut"), [$this, "axonaut_display_sync_new_customers"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_sells", __('Synchronisation des ventes', "axonaut"), [$this, "axonaut_display_sync_sells"], "axonaut_settings", "configuration_section");
+            add_settings_field("axonaut_sync_credit_notes", __('Avoirs (remboursements et annulations)', "axonaut"), [$this, "axonaut_display_sync_credit_notes"], "axonaut_settings", "configuration_section");
+            add_settings_field("axonaut_rounding_mode", __('Arrondis', "axonaut"), [$this, "axonaut_display_rounding_mode"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_webhook_info", __('Webhook de stock Axonaut', "axonaut"), [$this, "axonaut_display_sync_stocks"], "axonaut_settings", "configuration_section");
             register_setting("configuration_section", "axonaut_api_key");
             register_setting("configuration_section", "axonaut_product_match", array('sanitize_callback' => function ($v) {
@@ -193,6 +195,10 @@ class Axonaut_Admin
             register_setting("configuration_section", "axonaut_sync_existing_customers");
             register_setting("configuration_section", "axonaut_sync_new_customers");
             register_setting("configuration_section", "axonaut_sync_sells");
+            register_setting("configuration_section", "axonaut_sync_credit_notes");
+            register_setting("configuration_section", "axonaut_rounding_mode", array('sanitize_callback' => function ($v) {
+                return $v === 'adjust' ? 'adjust' : 'off';
+            }));
         } else if ($tab == "synchro") {
             add_settings_section("axonaut_synchro_section", __("Synchronisation des données WooCommerce > Axonaut", "axonaut"), [$this, "axonaut_display_axo_synchro_content"], "axonaut_settings");
             add_settings_field("axonaut_last_sync_date", __("Dernière synchronisation", "axonaut"), [$this, "axonaut_display_last_sync_date"], "axonaut_settings", "axonaut_synchro_section");
@@ -305,6 +311,28 @@ class Axonaut_Admin
     public function axonaut_display_sync_sells()
     {
         echo AxonautDisplay::create_switch("axonaut_sync_sells");
+    }
+
+    /**
+     * Avoirs Axonaut pour les remboursements et annulations
+     */
+    public function axonaut_display_sync_credit_notes()
+    {
+        echo AxonautDisplay::create_switch("axonaut_sync_credit_notes");
+        echo "<p class='description'>" . esc_html__("Un remboursement WooCommerce crée un avoir lié à la facture Axonaut. Une commande annulée après facturation crée un avoir pour le solde non remboursé.", "axonaut") . "</p>";
+    }
+
+    /**
+     * Correction des écarts d'arrondi
+     */
+    public function axonaut_display_rounding_mode()
+    {
+        $value = get_option('axonaut_rounding_mode', 'off');
+        echo "<select name='axonaut_rounding_mode' id='axonaut_rounding_mode'>";
+        echo "<option value='off'" . selected($value, 'off', false) . ">" . esc_html__("Signaler les écarts (note sur la commande)", "axonaut") . "</option>";
+        echo "<option value='adjust'" . selected($value, 'adjust', false) . ">" . esc_html__("Ajouter une ligne d'arrondi (expérimental)", "axonaut") . "</option>";
+        echo "</select>";
+        echo "<p class='description'>" . esc_html__("Ajoute au plus 5 centimes sur la facture pour que son total égale celui de la commande.", "axonaut") . "</p>";
     }
 
     /**

@@ -90,3 +90,46 @@ if (!defined('HOUR_IN_SECONDS')) { define('HOUR_IN_SECONDS', 3600); }
 $GLOBALS['axo_as'] = array();
 function as_has_scheduled_action($hook, $args, $group) { return isset($GLOBALS['axo_as'][md5($hook . json_encode($args))]); }
 function as_schedule_single_action($when, $hook, $args, $group) { $GLOBALS['axo_as'][md5($hook . json_encode($args))] = $when; return 1; }
+
+// ---- Commandes, remboursements, TVA
+class WC_Tax {
+    static $rates = array();
+    static function _get_tax_rate($id) { return isset(self::$rates[$id]) ? array('tax_rate' => self::$rates[$id]) : false; }
+}
+class FakeItem {
+    public $d;
+    function __construct($d) { $this->d = $d + array('qty' => 1, 'total' => 0, 'tax' => 0, 'taxes' => array('total' => array()), 'product' => null, 'status' => 'taxable', 'id' => 1); }
+    function get_id() { return $this->d['id']; }
+    function get_quantity() { return $this->d['qty']; }
+    function get_total() { return $this->d['total']; }
+    function get_total_tax() { return $this->d['tax']; }
+    function get_taxes() { return $this->d['taxes']; }
+    function get_product() { return $this->d['product'] ?: false; }
+    function get_tax_status() { return $this->d['status']; }
+}
+class FakeOrder {
+    public $d;
+    function __construct($d) { $this->d = $d + array('items' => array(), 'shipping' => array(), 'fee' => array(), 'total' => 0, 'refunded' => 0, 'meta' => array(), 'notes' => array(), 'email' => 'client@example.com'); }
+    function get_id() { return $this->d['id']; }
+    function get_items($type = 'line_item') { return $type === 'shipping' ? $this->d['shipping'] : ($type === 'fee' ? $this->d['fee'] : $this->d['items']); }
+    function get_total() { return $this->d['total']; }
+    function get_total_refunded() { return $this->d['refunded']; }
+    function get_total_tax() { return 0; }
+    function get_total_tax_refunded() { return 0; }
+    function get_meta($k) { return isset($this->d['meta'][$k]) ? $this->d['meta'][$k] : ''; }
+    function update_meta_data($k, $v) { $this->d['meta'][$k] = $v; }
+    function delete_meta_data($k) { unset($this->d['meta'][$k]); }
+    function save_meta_data() {}
+    function add_order_note($n) { $this->d['notes'][] = $n; }
+    function get_billing_email() { return $this->d['email']; }
+    function get_shipping_address_1() { return ''; }
+    function get_customer_id() { return 0; }
+    function get_payment_method() { return 'stripe'; }
+    // remboursement
+    function get_amount() { return isset($this->d['amount']) ? $this->d['amount'] : 0; }
+    function get_reason() { return isset($this->d['reason']) ? $this->d['reason'] : ''; }
+}
+$GLOBALS['axo_orders'] = array();
+function wc_get_order($id) { return isset($GLOBALS['axo_orders'][$id]) ? $GLOBALS['axo_orders'][$id] : false; }
+function add_option($k, $v = '', $d = '', $a = 'yes') { if (array_key_exists($k, $GLOBALS['axo_options'])) { return false; } $GLOBALS['axo_options'][$k] = $v; return true; }
+function delete_option($k) { unset($GLOBALS['axo_options'][$k]); return true; }

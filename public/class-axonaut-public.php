@@ -10,7 +10,7 @@
  */
 
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-customer.php";
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-sell.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-order-sync.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-webhooks.php";
 
 class Axonaut_Public
@@ -90,50 +90,8 @@ class Axonaut_Public
         wp_enqueue_script($this->plugin_name, plugin_dir_url(__FILE__) . 'js/axonaut-public.js', array('jquery'), $this->version, false);
     }
 
-    /**
-     * Hook when an order is pay by the client.
-     * @param $orderId : id of the order
-     */
-    public function hook_sell_pay($orderId)
-    {
-        if (strcmp(get_option('axonaut_sync_sells'), "on") !== 0) {
-	        return;
-        }
-
-        $order = new WC_Order($orderId);
-        $sell = new AxonautSell($order);
-        $sell->send_pay();
-    }
-
-    /**
-     * Hook when a client create a new order.
-     * @param $orderId : id of the new order
-     */
-    public function hook_sell($orderId)
-    {
-	    if (strcmp(get_option('axonaut_sync_sells'), "on") !== 0) {
-		    return;
-	    }
-
-        $order = new WC_Order($orderId);
-        $sell = new AxonautSell($order);
-        $sell->send();
-    }
-
-    /**
-     * Cancel payment
-     * @param $orderId : id of the new order
-     */
-    public function hook_cancel_order($orderId)
-    {
-        if (strcmp(get_option('axonaut_sync_sells'), "on") !== 0) {
-            return;
-        }
-
-        $order = new WC_Order($orderId);
-        $sell = new AxonautSell($order);
-        $sell->cancel_order();
-    }
+    // Les hooks de commande (statuts En cours, Terminée, Annulée, remboursement) sont traités
+    // en arrière-plan par Axonaut_Order_Sync, avec verrou et nouvelles tentatives.
 
     /**
      * Hook when a visitor create an account on Woocommerce.
