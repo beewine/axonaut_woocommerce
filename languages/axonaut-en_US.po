@@ -1,0 +1,170 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: axonaut\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-03-01 13:24+0100\n"
+"PO-Revision-Date: 2021-03-01 13:24+0100\n"
+"Last-Translator: \n"
+"Language-Team: axonaut\n"
+"Language: en_US\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.4.2\n"
+"X-Domain: languages\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Poedit-Basepath: ..\n"
+"X-Poedit-KeywordsList: __;_e\n"
+"X-Poedit-SearchPath-0: admin/class-axonaut-admin.php\n"
+"X-Poedit-SearchPath-1: includes/update-manager.php\n"
+
+#: admin/class-axonaut-admin.php:88
+msgid "Configuration du module Axonaut"
+msgstr "Axonaut settings panel"
+
+#: admin/class-axonaut-admin.php:91
+msgid "Paramètres sauvegardés"
+msgstr "Settings saved"
+
+#: admin/class-axonaut-admin.php:105
+msgid "Configuration"
+msgstr "Settings"
+
+#: admin/class-axonaut-admin.php:108
+msgid "Synchronisation"
+msgstr "Synchronization"
+
+#: admin/class-axonaut-admin.php:111
+msgid "Utilitaires"
+msgstr "Utilities"
+
+#: admin/class-axonaut-admin.php:126 admin/class-axonaut-admin.php:129
+msgid "Synchroniser l'ensemble de mes données"
+msgstr "Synchronize all data"
+
+#: admin/class-axonaut-admin.php:132
+msgid ""
+"Veuillez attendre au moins 1 minute depuis la dernière synchronisation avant "
+"d'en faire une nouvelle."
+msgstr "Please wait at least 1 minute since the last synchronization."
+
+#: admin/class-axonaut-admin.php:136
+msgid "Enregistrer les changements"
+msgstr "Save settings"
+
+#: admin/class-axonaut-admin.php:140
+msgid "Version du module Axonaut : "
+msgstr "Axonaut plugin version : "
+
+#: admin/class-axonaut-admin.php:175
+msgid "Paramètres du module Axonaut"
+msgstr "Axonaut plugin settings"
+
+#: admin/class-axonaut-admin.php:176
+msgid "Clé d'API"
+msgstr "API Key"
+
+#: admin/class-axonaut-admin.php:177
+msgid "Synchronisation des produits"
+msgstr "Enable products synchronization"
+
+#: admin/class-axonaut-admin.php:178
+msgid "Synchronisation des clients existants"
+msgstr "Enable existing customers synchronization"
+
+#: admin/class-axonaut-admin.php:179
+msgid "Synchronisation des nouveaux clients"
+msgstr "Enable new customers synchronization"
+
+#: admin/class-axonaut-admin.php:180
+msgid "Synchronisation des ventes"
+msgstr "Enable orders synchronization"
+
+#: admin/class-axonaut-admin.php:187
+msgid "Synchronisation des données WooCommerce > Axonaut"
+msgstr "Data synchronization WooCommerce > Axonaut"
+
+#: admin/class-axonaut-admin.php:188
+msgid "Dernière synchronisation"
+msgstr "Last synchronization"
+
+#: admin/class-axonaut-admin.php:192
+msgid "Informations utiles"
+msgstr "Useful info"
+
+#: admin/class-axonaut-admin.php:193
+msgid "Télécharger le fichier log.txt"
+msgstr "Dowload log.txt file"
+
+#: admin/class-axonaut-admin.php:194
+msgid "Contacter Axonaut"
+msgstr "Contact Axonaut"
+
+#: admin/class-axonaut-admin.php:246
+msgid ""
+"<b>Configuration du module :</b>\n"
+"        <br/>- La <b>clé API</b> se trouve sur <a href='https://axonaut.com/"
+"utilities/api' target='_blank'>votre page profil Axonaut</a>. <b>Attention</"
+"b> : assurez vous que l'utilisateur correspondant à cette clé possède le "
+"rôle <b>\"Administrateur\"</b> sur Axonaut !\n"
+"        <br/>- <b>Synchronisation des produits</b> : vos produits seront mis "
+"à jour dans Axonaut (nom, prix, taxe, description, quantité, ...).\n"
+"        <br/>- <b>Synchronisation des nouveaux clients</b> : les "
+"utilisateurs qui s'inscrivent à votre boutique et/ou passent une commande "
+"seront créés dans Axonaut et identifiés grâce à leur adresse email.\n"
+"        <br/>- <b>Synchronisation des ventes</b> : les commandes passées à "
+"\"En cours\" généreront des factures, et les commandes passées à \"Terminée"
+"\" généreront le paiement correspondant dans Axonaut."
+msgstr ""
+"<b>Plugin configuration :</b>\n"
+"        <br/>- The <b>API key</b> is available <a href='https://axonaut.com/"
+"utilities/api' target='_blank'>on your Axonaut profile</a>. <b>Warning</b> : "
+"the user of this API key must own the <b>\"Manager\"</b> role on Axonaut !\n"
+"        <br/>- <b>Products synchronization</b> : your products will be "
+"updated in Axonaut (name, price, tax rate, description, quantity, ...).\n"
+"        <br/>- <b>New customers synchronization</b> : users who subscribe to "
+"your shop and/or make an order will be created in Axonaut and indentified "
+"with their email address.\n"
+"        <br/>- <b>Orders synchronization</b> : orders updated to \"In "
+"progress\" will create invoices, and order updated to \"Finished\" will "
+"generate payments in Axonaut."
+
+#: admin/class-axonaut-admin.php:258
+msgid ""
+"La synchronisation suivante s'appliquera sur l'ensemble de vos <b>clients et "
+"produits <u>existants</u></b> dans WooCommerce avec Axonaut en un clic.\n"
+"        <br/>Pour réaliser cette synchronisation, veuillez cliquer sur le "
+"bouton ci-dessous.\n"
+"        <br/><br/>"
+msgstr ""
+"The following synchronization will be applied on all your <u>existing</u> "
+"<b>customers and products </b>from WooCommerce to  Axonaut in one click.\n"
+"        <br/><br/>"
+
+#: admin/class-axonaut-admin.php:278
+msgid "Cliquez ici pour télécharger le fichier log.txt"
+msgstr "Dowload log.txt file"
+
+#: admin/class-axonaut-admin.php:305
+msgid ""
+"Nous travaillons en permanence sur le module afin de l'améliorer. Veillez à "
+"bien mettre à jour votre module à chaque fois que l'option vous est proposée."
+msgstr ""
+"We are permanently working to improve the plugin. Please update the plugin "
+"every time a new version is released."
+
+#: admin/class-axonaut-admin.php:312
+msgid "En cas de problème, n'hésitez pas à"
+msgstr "In case of an issue, do not hesitate to"
+
+#: admin/class-axonaut-admin.php:312
+msgid "nous contacter directement sur Axonaut"
+msgstr "contact us directly on Axonaut"
+
+#: includes/update-manager.php:35
+msgid "Une nouvelle version du module Axonaut est disponible"
+msgstr "A new version of the Axonaut plugin is available"
+
+#: includes/update-manager.php:36
+msgid "Veuillez la télécharger en cliquant ici"
+msgstr "Please download by clicking here"

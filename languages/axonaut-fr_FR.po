@@ -1,0 +1,147 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: axonaut\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-03-01 12:50+0100\n"
+"PO-Revision-Date: 2021-03-10 08:59+0100\n"
+"Last-Translator: \n"
+"Language-Team: axonaut\n"
+"Language: fr_FR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 2.4.2\n"
+"X-Domain: languages\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+"X-Poedit-Basepath: ..\n"
+"X-Poedit-KeywordsList: __;_e\n"
+"X-Poedit-SearchPath-0: admin/class-axonaut-admin.php\n"
+"X-Poedit-SearchPath-1: includes/update-manager.php\n"
+
+#: class-axonaut-admin.php:91
+msgid "Paramètres sauvegardés"
+msgstr "Paramètres sauvegardés"
+
+#: class-axonaut-admin.php:105
+msgid "Configuration"
+msgstr "Configuration"
+
+#: class-axonaut-admin.php:108
+msgid "Synchronisation"
+msgstr "Synchronisation"
+
+#: class-axonaut-admin.php:111
+msgid "Utilitaires"
+msgstr "Utilitaires"
+
+#: class-axonaut-admin.php:126 class-axonaut-admin.php:129
+msgid "Synchroniser l'ensemble de mes données"
+msgstr "Synchroniser l'ensemble de mes données"
+
+#: class-axonaut-admin.php:132
+msgid ""
+"Veuillez attendre au moins 1 minute depuis la dernière synchronisation avant d'en "
+"faire une nouvelle."
+msgstr ""
+"Veuillez attendre au moins 1 minute depuis la dernière synchronisation avant d'en "
+"faire une nouvelle."
+
+#: class-axonaut-admin.php:136
+msgid "Enregistrer les changements"
+msgstr "Enregistrer les changements"
+
+#: class-axonaut-admin.php:140
+msgid "Version du module Axonaut : "
+msgstr "Version du module Axonaut : "
+
+#: class-axonaut-admin.php:175
+msgid "Paramètres du module Axonaut"
+msgstr "Paramètres du module Axonaut"
+
+#: class-axonaut-admin.php:176
+msgid "Clé d'API"
+msgstr "Clé d'API"
+
+#: class-axonaut-admin.php:177
+msgid "Synchronisation des produits"
+msgstr "Synchronisation des produits"
+
+#: class-axonaut-admin.php:178
+msgid "Synchronisation des clients existants"
+msgstr "Synchronisation des clients existants"
+
+#: class-axonaut-admin.php:179
+msgid "Synchronisation des nouveaux clients"
+msgstr "Synchronisation des nouveaux clients"
+
+#: class-axonaut-admin.php:180
+msgid "Synchronisation des ventes"
+msgstr "Synchronisation des ventes"
+
+#: class-axonaut-admin.php:187
+msgid "Synchronisation des données WooCommerce > Axonaut"
+msgstr "Synchronisation des données WooCommerce > Axonaut"
+
+#: class-axonaut-admin.php:188
+msgid "Dernière synchronisation"
+msgstr "Dernière synchronisation"
+
+#: class-axonaut-admin.php:192
+msgid "Informations utiles"
+msgstr "Informations utiles"
+
+#: class-axonaut-admin.php:193
+msgid "Télécharger le fichier log.txt"
+msgstr "Télécharger le fichier log.txt"
+
+#: class-axonaut-admin.php:194
+msgid "Contacter Axonaut"
+msgstr "Contacter Axonaut"
+
+#: class-axonaut-admin.php:246
+msgid ""
+"<b>Configuration du module :</b>\n"
+"        <br/>- La <b>clé API</b> se trouve sur <a href='https://axonaut.com/"
+"utilities/api' target='_blank'>votre page profil Axonaut</a>. <b>Attention</b> : "
+"assurez vous que l'utilisateur correspondant à cette clé possède le rôle <b>"
+"\"Administrateur\"</b> sur Axonaut !\n"
+"        <br/>- <b>Synchronisation des produits</b> : vos produits seront mis à jour "
+"dans Axonaut (nom, prix, taxe, description, quantité, ...).\n"
+"        <br/>- <b>Synchronisation des nouveaux clients</b> : les utilisateurs qui "
+"s'inscrivent à votre boutique et/ou passent une commande seront créés dans Axonaut "
+"et identifiés grâce à leur adresse email.\n"
+"        <br/>- <b>Synchronisation des ventes</b> : les commandes passées à \"En "
+"cours\" généreront des factures, et les commandes passées à \"Terminée\" généreront "
+"le paiement correspondant dans Axonaut."
+msgstr ""
+"<b>Configuration du module :</b>\n"
+"        <br/>- La <b>clé API</b> se trouve sur <a href='https://axonaut.com/"
+"utilities/api' target='_blank'>votre page profil Axonaut</a>. <b>Attention</b> : "
+"assurez vous que l'utilisateur correspondant à cette clé possède le rôle <b>"
+"\"Administrateur\"</b> sur Axonaut !\n"
+"        <br/>- <b>Synchronisation des produits</b> : vos produits seront mis à jour "
+"dans Axonaut (nom, prix, taxe, description, quantité, ...).\n"
+"        <br/>- <b>Synchronisation des nouveaux clients</b> : les utilisateurs qui "
+"s'inscrivent à votre boutique et/ou passent une commande seront créés dans Axonaut "
+"et identifiés grâce à leur adresse email.\n"
+"        <br/>- <b>Synchronisation des ventes</b> : les commandes passées à \"En "
+"cours\" généreront des factures, et les commandes passées à \"Terminée\" généreront "
+"le paiement correspondant dans Axonaut."
+
+#: class-axonaut-admin.php:258
+msgid ""
+"La synchronisation suivante s'appliquera sur l'ensemble de vos <b>clients et "
+"produits <u>existants</u></b> dans WooCommerce avec Axonaut en un clic.\n"
+"        <br/>Pour réaliser cette synchronisation, veuillez cliquer sur le bouton ci-"
+"dessous.\n"
+"        <br/><br/>"
+msgstr ""
+"La synchronisation suivante s'appliquera sur l'ensemble de vos <b>clients et "
+"produits <u>existants</u></b> dans WooCommerce avec Axonaut en un clic.\n"
+"        <br/>Pour réaliser cette synchronisation, veuillez cliquer sur le bouton ci-"
+"dessous.\n"
+"        <br/><br/>"
+
+#: class-axonaut-admin.php:278
+msgid "Cliquez ici pour télécharger le fichier log.txt"
+msgstr "Cliquez ici pour télécharger le fichier log.txt"
