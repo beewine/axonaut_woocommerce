@@ -114,6 +114,7 @@ class Axonaut
         require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-axonaut-public.php';
 
         require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-axonaut-product-sync.php';
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-axonaut-product-import.php';
 
         $this->loader = new Axonaut_Loader();
 
@@ -148,6 +149,7 @@ class Axonaut
 
         $this->loader->add_action('admin_menu', $plugin_admin, 'axonaut_add_admin_menu');
         $this->loader->add_action('admin_init', $plugin_admin, 'axonaut_settings_init');
+        $this->loader->add_action('admin_init', 'Axonaut_Product_Import', 'ensure_schedule');
         $this->loader->add_action('wp_enqueue_styles', $plugin_admin, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_admin, 'enqueue_scripts');
         $this->loader->add_action('wp_ajax_axonaut_sync', $plugin_admin, 'ajax_sync');
@@ -190,6 +192,8 @@ class Axonaut
         $this->loader->add_action('user_register', $plugin_public, 'hook_register');
         $this->loader->add_action(Axonaut_Queue::HOOK_PRODUCT, 'Axonaut_Product_Sync', 'run');
         $this->loader->add_action(Axonaut_Queue::HOOK_STOCK, 'Axonaut_Stock_Sync', 'run');
+        $this->loader->add_action(Axonaut_Product_Import::HOOK_START, 'Axonaut_Product_Import', 'start');
+        $this->loader->add_action(Axonaut_Product_Import::HOOK_PAGE, 'Axonaut_Product_Import', 'run_page');
         // Temps réel : sauvegarde d'un produit ou d'une variation, changement de stock.
         $this->loader->add_action('woocommerce_new_product', 'Axonaut_Product_Sync', 'on_product_saved');
         $this->loader->add_action('woocommerce_update_product', 'Axonaut_Product_Sync', 'on_product_saved');

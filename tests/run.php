@@ -11,6 +11,7 @@ require_once $root . '/includes/class-axonaut-snapshot.php';
 require_once $root . '/includes/class-axonaut-merge.php';
 require_once $root . '/includes/class-axonaut-queue.php';
 require_once $root . '/includes/class-axonaut-stock-sync.php';
+require_once $root . '/includes/class-axonaut-product-import.php';
 
 echo "Axonaut_Api\n";
 $GLOBALS['axo_http_queue'][] = array('code' => 200, 'body' => '[{"id":7}]');
@@ -165,6 +166,47 @@ echo "Axonaut_Queue\n";
 Axonaut_Queue::enqueue_stock(500, 30);
 Axonaut_Queue::enqueue_stock(500, 30);
 check('une seule tâche en attente par produit', count($GLOBALS['axo_as']) === 1);
+
+echo "Axonaut_Product_Import\n";
+$GLOBALS['axo_options'] = array('axonaut_api_key' => 'KEY', 'axonaut_dir_name' => 'from_axonaut', 'axonaut_dir_description' => 'both', 'axonaut_dir_price' => 'from_axonaut', 'axonaut_dir_stock' => 'none', 'axonaut_conflict_winner' => 'woocommerce');
+$GLOBALS['axo_http'] = array();
+$GLOBALS['axo_as'] = array();
+$ip = new FakeProduct(array('id' => 700, 'name' => 'Ancien nom', 'short' => 'Ancien descriptif', 'price' => 10.0));
+$GLOBALS['axo_wc_products'][700] = $ip;
+Axonaut_Snapshot::update($ip, array('name' => 'Ancien nom', 'description' => 'Ancien descriptif', 'price' => '10.00'));
+$updated = Axonaut_Product_Import::import_one(array('id' => 90, 'internal_id' => '700', 'product_code' => '', 'name' => 'Nouveau nom', 'description' => 'Ancien descriptif', 'price' => 12.5));
+check('titre et prix importés, descriptif inchangé', $updated === array('name', 'price') && $ip->get_name() === 'Nouveau nom' && $ip->d['price'] === 12.5);
+check('instantané mis à jour', Axonaut_Snapshot::get($ip)['name'] === 'Nouveau nom' && Axonaut_Snapshot::get($ip)['price'] === '12.50');
+check('aucun produit à renvoyer vers Axonaut', count($GLOBALS['axo_as']) === 0);
+
+// descriptif dans les deux sens : modifié seulement côté WooCommerce => renvoi vers Axonaut, pas d'écrasement
+$ip->d['short'] = 'Descriptif WooCommerce';
+$updated = Axonaut_Product_Import::import_one(array('id' => 90, 'internal_id' => '700', 'name' => 'Nouveau nom', 'description' => 'Ancien descriptif', 'price' => 12.5));
+check('modifié côté WooCommerce seulement : conservé', $ip->d['short'] === 'Descriptif WooCommerce' && !in_array('description', $updated, true));
+check('...et planifié vers Axonaut', count($GLOBALS['axo_as']) === 1);
+
+// modifié des deux côtés, WooCommerce l'emporte
+$updated = Axonaut_Product_Import::import_one(array('id' => 90, 'internal_id' => '700', 'name' => 'Nouveau nom', 'description' => 'Descriptif Axonaut', 'price' => 12.5));
+check('conflit : WooCommerce l\'emporte', $ip->d['short'] === 'Descriptif WooCommerce');
+$GLOBALS['axo_options']['axonaut_conflict_winner'] = 'axonaut';
+$updated = Axonaut_Product_Import::import_one(array('id' => 90, 'internal_id' => '700', 'name' => 'Nouveau nom', 'description' => 'Descriptif Axonaut', 'price' => 12.5));
+check('conflit : Axonaut l\'emporte', $ip->d['short'] === 'Descriptif Axonaut' && in_array('description', $updated, true));
+
+// prix promotionnel : jamais écrasé
+$ip->d['on_sale'] = true;
+$updated = Axonaut_Product_Import::import_one(array('id' => 90, 'internal_id' => '700', 'name' => 'Nouveau nom', 'description' => 'Descriptif Axonaut', 'price' => 99.0));
+check('produit en promotion : prix ignoré', $ip->d['price'] === 12.5);
+
+// produit inconnu de WooCommerce : ignoré
+check('produit absent de WooCommerce : ignoré', Axonaut_Product_Import::import_one(array('id' => 91, 'internal_id' => '8888', 'product_code' => 'NOPE', 'name' => 'X')) === array());
+
+// liaison par référence : PATCH de l'internal_id
+$GLOBALS['axo_options']['axonaut_product_match'] = 'sku_then_id';
+$GLOBALS['axo_wc_products'][701] = new FakeProduct(array('id' => 701, 'sku' => 'LINK-1', 'name' => 'Lié', 'price' => 5.0));
+$GLOBALS['axo_http'] = array();
+$GLOBALS['axo_http_queue'] = array(array('code' => 200, 'body' => '{}'));
+Axonaut_Product_Import::import_one(array('id' => 92, 'internal_id' => '', 'product_code' => 'LINK-1', 'name' => 'Lié', 'price' => 5.0));
+check('produit Axonaut sans internal_id lié par sa référence', count($GLOBALS['axo_http']) === 1 && strpos($GLOBALS['axo_http'][0]['args']['body'], '"internal_id":"701"') !== false);
 
 echo $GLOBALS['axo_fail'] ? "\n{$GLOBALS['axo_fail']} échec(s)\n" : "\nTout est vert\n";
 exit($GLOBALS['axo_fail'] ? 1 : 0);
