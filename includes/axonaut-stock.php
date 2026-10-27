@@ -1,21 +1,12 @@
 <?php
 
 /**
- * The StockLog  class
- *
- * This is used to manage stockLog events
+ * Message stockLog.created reçu d'Axonaut.
  *
  * @since      3.0.0
  * @package    Axonaut
  * @subpackage Axonaut/includes
  */
-
-use WpOrg\Requests\Exception;
-
- //ck_f672b1fa40ce408f9e22227460efb1411f221e13
-
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-product.php";
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 
 class AxonautStockLog
 {
@@ -24,66 +15,45 @@ class AxonautStockLog
     public $date;
     public $topic = "stockLog.created";
 
-    /**
-     * Product data
-     * @var AxonautStockLogProduct
-     */
-    public $data;
-
-    /**
-     * AxonautStockLog constructor.
-     */
-    public function __construct($request)
-    {
-        $body = json_decode($request->get_body());
-        $this->validate($body);
-        $this->id = $body->id;
-        $this->timestamp = $body->timestamp;
-        $this->date = $body->date;
-        $this->data = new AxonautStockLogProduct($body->data);
-    }
-
-    private function validate(stdClass $body)
-    {
-        if($body->topic != $this->topic) throw new Exception( 'bad_topic', __( "Bad topic sent", "axonaut" ) );
-        if(!isset($body->data->product->internal_id) || ($body->data->product->internal_id === ""))  throw new Exception( 'internal_id_missing', __( "internal_id missing", "axonaut" ) );
-        if(!isset($body->data->current_stock) || ($body->data->current_stock === ""))  throw new Exception( 'current_stock_missing', __( "current_stock missing", "axonaut" ) );
-    }
-}
-
-class AxonautStockLogProduct
-{
     public $product_id;
     public $current_stock;
-    public $weighted_average_cost;
-    public $raw_material = [];
-    public $product;
-
-    /**
-     * AxonautStockLogProduct constructor.
-     */
-    public function __construct($product)
-    {
-        $this->product_id = $product->product_id;
-        $this->current_stock = $product->current_stock;
-        $this->weighted_average_cost = $product->weighted_average_cost;
-        $this->raw_material = $product->raw_material;
-        $this->product = new AxonautStockLogProductInfo($product->product);
-    }
-}
-
-
-class AxonautStockLogProductInfo
-{
     public $internal_id;
     public $product_code;
 
     /**
-     * AxonautStockLogProductInfo constructor.
+     * Construit le message à partir de la requête REST.
+     *
+     * @param WP_REST_Request $request
+     * @return AxonautStockLog|WP_Error
      */
-    public function __construct($product)
+    public static function from_request($request)
     {
-        $this->internal_id = $product->internal_id;
-        $this->product_code = $product->product_code;
+        $body = json_decode($request->get_body());
+        if (!is_object($body) || !isset($body->data) || !is_object($body->data)) {
+            return new WP_Error('bad_payload', __("Corps de requête invalide", "axonaut"), array('status' => 400));
+        }
+        if (!isset($body->topic) || $body->topic !== "stockLog.created") {
+            return new WP_Error('bad_topic', __("Bad topic sent", "axonaut"), array('status' => 400));
+        }
+        if (!isset($body->data->current_stock) || $body->data->current_stock === "") {
+            return new WP_Error('current_stock_missing', __("current_stock missing", "axonaut"), array('status' => 400));
+        }
+
+        $product = isset($body->data->product) && is_object($body->data->product) ? $body->data->product : new stdClass();
+
+        $log = new self();
+        $log->id = isset($body->id) ? $body->id : null;
+        $log->timestamp = isset($body->timestamp) ? $body->timestamp : null;
+        $log->date = isset($body->date) ? $body->date : null;
+        $log->product_id = isset($body->data->product_id) ? $body->data->product_id : null;
+        $log->current_stock = $body->data->current_stock;
+        $log->internal_id = isset($product->internal_id) ? (string) $product->internal_id : "";
+        $log->product_code = isset($product->product_code) ? (string) $product->product_code : "";
+
+        if ($log->internal_id === "") {
+            return new WP_Error('internal_id_missing', __("internal_id missing", "axonaut"), array('status' => 400));
+        }
+
+        return $log;
     }
 }

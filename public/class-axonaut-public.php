@@ -154,12 +154,13 @@ class Axonaut_Public
     
     /**
      * Register webhooks
-     * @param $userId : id of the new user.
      */
-    public function axonaut_register_webhooks_endpoints(){
+    public function axonaut_register_webhooks_endpoints()
+    {
         register_rest_route('axonaut/v3', 'stocklog-created', array(
-            'methods' => WP_REST_Server::EDITABLE,
-            'callback' => [ new Axonaut_Webhooks,'axonaut_handle_webhook_stocklog_created'],
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => [new Axonaut_Webhooks, 'axonaut_handle_webhook_stocklog_created'],
+            'permission_callback' => [Axonaut_Webhooks::class, 'authorize'],
         ));
     }
 

@@ -148,6 +148,8 @@ class Axonaut
         $this->loader->add_action('admin_init', $plugin_admin, 'axonaut_settings_init');
         $this->loader->add_action('wp_enqueue_styles', $plugin_admin, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_admin, 'enqueue_scripts');
+        $this->loader->add_action('wp_ajax_axonaut_sync', $plugin_admin, 'ajax_sync');
+        $this->loader->add_action('admin_post_axonaut_download_log', $plugin_admin, 'download_log');
 //        $this->loader->add_action('woocommerce_product_options_sku', $plugin_admin, 'axonaut_add_custom_product_id');
 //        $this->loader->add_action('woocommerce_process_product_meta', $plugin_admin, 'axonaut_save_custom_product_id');
     }
@@ -164,6 +166,7 @@ class Axonaut
         $plugin_admin = new Axonaut_Public($this->get_plugin_name(), $this->get_version());
 
         $this->loader->add_endpoint('rest_api_init', $plugin_admin, 'axonaut_register_webhooks_endpoints');
+        $this->loader->add_filter('woocommerce_rest_is_request_to_rest_api', 'Axonaut_Webhooks', 'allow_woocommerce_key_auth');
     }
 
     /**

@@ -11,7 +11,8 @@
  */
 
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-display.php";
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/update-manager.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/log.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 
 class Axonaut_Admin
 {
@@ -82,9 +83,8 @@ class Axonaut_Admin
             settings_errors('wporg_messages');
             $active_tab = "configuration";
             if (isset($_GET["tab"])) {
-                $active_tab = $_GET["tab"];
+                $active_tab = sanitize_key($_GET["tab"]);
             }
-            checkUpdate();
             ?>
             <!-- wordpress provides the styling for tabs. -->
             <h2 class="nav-tab-wrapper">
@@ -100,12 +100,11 @@ class Axonaut_Admin
                 } ?>"><?php _e('Utilitaires', 'axonaut'); ?></a>
             </h2>
 
-            <form method="post" action=<?php if ($active_tab == 'synchro') {
-                echo plugin_dir_url(__FILE__) . "synchroAxonaut.php";
-            } else {
-                echo "options.php";
-            }
-            if ($active_tab == "synchro") { ?> name="sync" <?php } ?> >
+            <form method="post" action="<?php echo esc_url($active_tab == 'synchro' ? admin_url('admin-ajax.php') : 'options.php'); ?>" <?php if ($active_tab == "synchro") { ?>name="sync"<?php } ?>>
+            <?php if ($active_tab == "synchro") { ?>
+                <input type="hidden" name="action" value="axonaut_sync"/>
+                <input type="hidden" name="_axonaut_nonce" value="<?php echo esc_attr(wp_create_nonce('axonaut_sync')); ?>"/>
+            <?php } ?>
             <?php
 
             settings_fields($active_tab . "_section");
@@ -152,11 +151,7 @@ class Axonaut_Admin
         $this->enqueue_styles();
         $this->enqueue_scripts();
 
-        if (!isset($_GET["tab"]))
-            $tab = "configuration";
-        else {
-            $tab = $_GET["tab"];
-        }
+        $tab = isset($_GET["tab"]) ? sanitize_key($_GET["tab"]) : "configuration";
 
         if ($tab == "configuration") {
             // Enregistrement des configurations
@@ -204,7 +199,9 @@ class Axonaut_Admin
         echo AxonautDisplay::create_switch("axonaut_sync_stocks");
         echo "<input id='axonaut_sync_stocks_url' type='text' style='margin-left: 20px; margin-right: 20px; width: 380px;' readonly='readonly' value='".get_bloginfo('url')."/wp-json/axonaut/v3/stocklog-created'/>";
         echo "<div id='axonaut_sync_stocks_url_cpy_button' style='border: 1px solid #000; padding: 3px; display: inline-block;'><i class='dashicons dashicons-editor-paste-text'></i></div>";
-        echo __("<br/><br/><b>Important</b> : les stocks sont synchronisés depuis Axonaut, Axonaut est maître des informations de stock.<br/>", "axonaut");   
+        echo "<br/><br/>" . __("Secret du webhook (à ajouter dans Axonaut, en-tête <code>X-Axonaut-Secret</code>) :", "axonaut") . "<br/>";
+        echo "<input type='text' style='width: 380px;' readonly='readonly' value='" . esc_attr(axonaut_get_webhook_secret()) . "'/>";
+        echo __("<br/><br/><b>Important</b> : les stocks sont synchronisés depuis Axonaut, Axonaut est maître des informations de stock.<br/>", "axonaut");
         echo "<script>
         document.getElementById('axonaut_sync_stocks_url_cpy_button').addEventListener('click', () => {
                 navigator.clipboard.writeText(document.getElementById('axonaut_sync_stocks_url').value).then(() => {
@@ -283,7 +280,7 @@ class Axonaut_Admin
     {
         echo "
         <p>
-            <a href='".plugin_dir_url(dirname(__FILE__))."includes/downloadLogTxt.php'>" . __("Cliquez ici pour télécharger le fichier log.txt", "axonaut") . "</a>
+            <a href='" . esc_url(wp_nonce_url(admin_url('admin-post.php?action=axonaut_download_log'), 'axonaut_download_log')) . "'>" . __("Cliquez ici pour télécharger le fichier log.txt", "axonaut") . "</a>
         </p>
         ";
     }
@@ -330,4 +327,55 @@ class Axonaut_Admin
 ////		woocommerce_wp_text_input($args);
 //		woocommerce_wp_hidden_input($args);
 //	}
+
+    /**
+     * Synchronisation complète lancée depuis l'onglet « Synchronisation » (AJAX).
+     */
+    public function ajax_sync()
+    {
+        if (!current_user_can('manage_options') || !wp_verify_nonce(isset($_POST['_axonaut_nonce']) ? $_POST['_axonaut_nonce'] : '', 'axonaut_sync')) {
+            wp_die(esc_html__("Accès refusé", "axonaut"), '', array('response' => 403));
+        }
+
+        require_once plugin_dir_path(dirname(__FILE__)) . "includes/customer-manager.php";
+        require_once plugin_dir_path(dirname(__FILE__)) . "includes/product-manager.php";
+
+        axonaut_write_log("Synchronization...");
+        if (get_option('axonaut_api_key') == "") {
+            wp_die(esc_html__('Aucune clé API n\'a été trouvée. Veuillez vérifier que la clé a bien été renseignée dans l\'onglet "Configuration"', 'axonaut'));
+        }
+
+        update_option("axonaut_last_sync_date", new \DateTime());
+        if (get_option('axonaut_sync_existing_customers') == "on") {
+            $customer_manager = new CustomerManager();
+            $customer_manager->synchronize();
+            $customer_manager->dump();
+        }
+        if (get_option('axonaut_sync_products') == "on") {
+            $product_manager = new ProductManager();
+            $product_manager->synchronize();
+            if (get_option('axonaut_sync_existing_customers') == "on") {
+                echo " ";
+            }
+            $product_manager->dump();
+        }
+        wp_die();
+    }
+
+    /**
+     * Téléchargement du journal (admin-post).
+     */
+    public function download_log()
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die(esc_html__("Accès refusé", "axonaut"), '', array('response' => 403));
+        }
+        check_admin_referer('axonaut_download_log');
+
+        header('Content-Type: text/plain; charset=utf-8');
+        header('Content-Disposition: attachment; filename="axonaut-log.txt"');
+        header('Cache-Control: no-store');
+        echo read_log();
+        exit;
+    }
 }
