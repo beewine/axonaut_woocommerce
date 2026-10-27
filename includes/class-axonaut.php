@@ -113,6 +113,8 @@ class Axonaut
          */
         require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-axonaut-public.php';
 
+        require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-axonaut-product-sync.php';
+
         $this->loader = new Axonaut_Loader();
 
     }
@@ -186,6 +188,7 @@ class Axonaut
         $this->loader->add_action('woocommerce_order_status_processing', $plugin_public, 'hook_sell');
         $this->loader->add_action('woocommerce_order_status_cancelled', $plugin_public, 'hook_cancel_order');
         $this->loader->add_action('user_register', $plugin_public, 'hook_register');
+        $this->loader->add_action(Axonaut_Queue::HOOK_PRODUCT, 'Axonaut_Product_Sync', 'run');
     }
 
     /**

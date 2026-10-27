@@ -11,8 +11,7 @@
  */
 
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-api.php";
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/axonaut-product.php";
-require_once plugin_dir_path(dirname(__FILE__)) . "includes/product-manager.php";
+require_once plugin_dir_path(dirname(__FILE__)) . "includes/class-axonaut-product-resolver.php";
 require_once plugin_dir_path(dirname(__FILE__)) . "includes/utils.php";
 
 define("SHIPPING_UNIQUE_ID", "111999");
@@ -65,7 +64,6 @@ class AxonautSell
 		        $taxRate = 0;
 	        }
 	        else {
-	            axonaut_write_log(json_encode($itemData));
                 if ($itemData["total"] != 0) {
                     foreach (array_values($itemData["taxes"]["total"]) as $taxAmount) {
                         if (!empty($taxAmount)) {
@@ -75,36 +73,23 @@ class AxonautSell
                 }
 	        }
 
-	        // ========== Description ==========
+	        // ========== Produit et descriptif ==========
 
-            $description = "";
-            $name = $product->get_title();
-            if ($product->is_type("variation")) {
-                $productVariation = new WC_Product_Variation($product->get_id());
-                if (!is_null($productVariation)) {
-                    $description = $productVariation->get_description();
-                    $variationValues = "";
-                    foreach ($productVariation->get_attributes() as $key => $value) {
-                        $myVariation = $productVariation->get_attribute($key);
-                        $variationValues .= " " . $myVariation;
-                    }
-                    $name .= $variationValues;
+            $oneProduct["name"] = Axonaut_Product_Mapper::name($product);
+            $description = Axonaut_Product_Mapper::description($product);
+            $sku = Axonaut_Product_Mapper::sku($product);
+
+            // Un produit déjà connu d'Axonaut (par référence ou par ID) est désigné par son id Axonaut.
+            // Sinon, Axonaut le crée à partir de l'ID WooCommerce et de la référence.
+            $remote = Axonaut_Product_Resolver::match_mode() === 'sku_then_id' ? Axonaut_Product_Resolver::find_remote($product) : null;
+            if ($remote !== null) {
+                $oneProduct["id"] = (int) $remote["id"];
+            } else {
+                $oneProduct["internal_id"] = (string) $product->get_id();
+                if ($sku !== '') {
+                    $oneProduct["product_code"] = $sku;
                 }
             }
-            if (empty($description)) {
-                $description = $product->get_short_description();
-                if (!empty($description)) {
-                    $description = str_replace(";", " ", strip_tags(htmlspecialchars_decode($description), '<p><strong><del><em>'));
-                }
-
-                // tckt374237
-//                else {
-//                    $description = str_replace(";", " ", strip_tags(htmlspecialchars_decode($product->get_title()), '<p><strong><del><em>'));
-//                }
-            }
-
-	        $oneProduct["name"] = $name;
-	        $oneProduct["internal_id"] = $product->get_id();
 	        $oneProduct["price"] = $item->get_total() / $item->get_quantity(); // total price/quantity to get unit price
 	        $oneProduct["tax_rate"] = $taxRate;
 	        $oneProduct["quantity"] = $item->get_quantity();
@@ -116,7 +101,6 @@ class AxonautSell
             array_push($products, $oneProduct);
         }
 
-        axonaut_write_log(json_encode($this->order));
 
         // Add shipping
         if ($this->order->get_shipping_total() > 0) {
@@ -203,7 +187,6 @@ class AxonautSell
             );
         }
 
-        axonaut_write_log(json_encode($body));
 
         $result = Axonaut_Api::post('/api/v2/invoices', $body);
         if (!$result['ok']) {

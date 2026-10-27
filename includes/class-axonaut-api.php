@@ -54,6 +54,13 @@ class Axonaut_Api
 
         $response = wp_remote_request($url, $args);
 
+        // Limite de débit atteinte : on patiente (au plus 10 s) puis on réessaie une fois.
+        if (!is_wp_error($response) && (int) wp_remote_retrieve_response_code($response) === 429) {
+            $wait = (int) wp_remote_retrieve_header($response, 'retry-after');
+            sleep(min(max($wait, 1), 10));
+            $response = wp_remote_request($url, $args);
+        }
+
         if (is_wp_error($response)) {
             $message = $response->get_error_message();
             axonaut_write_log("$method $path : $message", AXONAUT_LOG_ERROR);

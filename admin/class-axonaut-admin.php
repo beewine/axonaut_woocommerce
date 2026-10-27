@@ -158,11 +158,19 @@ class Axonaut_Admin
             add_settings_section("configuration_section", __("Paramètres du module Axonaut", "axonaut"), [$this, "axonaut_display_header_options_content"], "axonaut_settings");
             add_settings_field("axonaut_api_key", __('Clé d\'API', "axonaut"), [$this, "axonaut_display_api_key"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_products", __('Synchronisation des produits', "axonaut"), [$this, "axonaut_display_sync_products"], "axonaut_settings", "configuration_section");
+            add_settings_field("axonaut_product_match", __('Rapprochement des produits', "axonaut"), [$this, "axonaut_display_product_match"], "axonaut_settings", "configuration_section");
+            add_settings_field("axonaut_description_source", __('Descriptif envoyé à Axonaut', "axonaut"), [$this, "axonaut_display_description_source"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_existing_customers", __('Synchronisation des clients existants', "axonaut"), [$this, "axonaut_display_sync_existing_customers"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_new_customers", __('Synchronisation des nouveaux clients', "axonaut"), [$this, "axonaut_display_sync_new_customers"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_sells", __('Synchronisation des ventes', "axonaut"), [$this, "axonaut_display_sync_sells"], "axonaut_settings", "configuration_section");
             add_settings_field("axonaut_sync_stocks", __('Synchronisation des stocks depuis Axonaut', "axonaut"), [$this, "axonaut_display_sync_stocks"], "axonaut_settings", "configuration_section");
             register_setting("configuration_section", "axonaut_api_key");
+            register_setting("configuration_section", "axonaut_product_match", array('sanitize_callback' => function ($v) {
+                return $v === 'id_only' ? 'id_only' : 'sku_then_id';
+            }));
+            register_setting("configuration_section", "axonaut_description_source", array('sanitize_callback' => function ($v) {
+                return in_array($v, array('short', 'long', 'short_then_long'), true) ? $v : 'short';
+            }));
             register_setting("configuration_section", "axonaut_sync_existing_customers");
             register_setting("configuration_section", "axonaut_sync_products");
             register_setting("configuration_section", "axonaut_sync_new_customers");
@@ -189,6 +197,32 @@ class Axonaut_Admin
         <input style="width: 380px;" type="text" name="axonaut_api_key" id="axonaut_api_key"
                value="<?php echo esc_attr(get_option('axonaut_api_key')); ?>"/>
         <?php
+    }
+
+    /**
+     * Mode de rapprochement entre produits WooCommerce et produits Axonaut
+     */
+    public function axonaut_display_product_match()
+    {
+        $value = get_option('axonaut_product_match', 'sku_then_id');
+        echo "<select name='axonaut_product_match' id='axonaut_product_match'>";
+        echo "<option value='sku_then_id'" . selected($value, 'sku_then_id', false) . ">" . esc_html__("Référence (UGS) d'abord, puis ID WooCommerce", "axonaut") . "</option>";
+        echo "<option value='id_only'" . selected($value, 'id_only', false) . ">" . esc_html__("ID WooCommerce uniquement (historique)", "axonaut") . "</option>";
+        echo "</select>";
+        echo "<p class='description'>" . esc_html__("La référence WooCommerce (UGS) est comparée à la référence du produit Axonaut. Le produit Axonaut retrouvé reçoit l'ID WooCommerce, ce qui sert ensuite pour le stock et les factures.", "axonaut") . "</p>";
+    }
+
+    /**
+     * Source du descriptif envoyé à Axonaut
+     */
+    public function axonaut_display_description_source()
+    {
+        $value = get_option('axonaut_description_source', 'short');
+        echo "<select name='axonaut_description_source' id='axonaut_description_source'>";
+        echo "<option value='short'" . selected($value, 'short', false) . ">" . esc_html__("Description courte", "axonaut") . "</option>";
+        echo "<option value='long'" . selected($value, 'long', false) . ">" . esc_html__("Description longue", "axonaut") . "</option>";
+        echo "<option value='short_then_long'" . selected($value, 'short_then_long', false) . ">" . esc_html__("Description courte, à défaut la longue", "axonaut") . "</option>";
+        echo "</select>";
     }
 
     /**

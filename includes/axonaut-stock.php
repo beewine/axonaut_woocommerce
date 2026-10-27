@@ -50,8 +50,8 @@ class AxonautStockLog
         $log->internal_id = isset($product->internal_id) ? (string) $product->internal_id : "";
         $log->product_code = isset($product->product_code) ? (string) $product->product_code : "";
 
-        if ($log->internal_id === "") {
-            return new WP_Error('internal_id_missing', __("internal_id missing", "axonaut"), array('status' => 400));
+        if ($log->internal_id === "" && $log->product_code === "") {
+            return new WP_Error('internal_id_missing', __("internal_id and product_code missing", "axonaut"), array('status' => 400));
         }
 
         return $log;
