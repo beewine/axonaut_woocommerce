@@ -38,65 +38,63 @@ class AxonautCustomer
 	 */
 	public function __construct($wcCustomer, $order = null, $isRegister = false)
     {
-        if (!$isRegister) {
-            if ($wcCustomer->get_id() != 0) {
-                $this->wcCustomer = $wcCustomer;
-                $d = get_user_meta($wcCustomer->ID);
-                if (!empty(f($d["billing_email"][0]))) {
-                    $billingEmail = f($d["billing_email"][0]);
-                } else {
-                    $billingEmail = $wcCustomer->data->user_email;
-                }
+        // $wcCustomer est un WC_Customer (commande) ou un WP_User (inscription).
+        $userId = method_exists($wcCustomer, 'get_id') ? (int) $wcCustomer->get_id() : (int) $wcCustomer->ID;
+        $userEmail = method_exists($wcCustomer, 'get_email') ? $wcCustomer->get_email() : (isset($wcCustomer->data->user_email) ? $wcCustomer->data->user_email : '');
 
-                $isFirstnameAndLastname = false;
-                if (isset($d['billing_company'][0]) && !empty($d['billing_company'][0])) {
-                    $companyName = $d['billing_company'][0];
-                } else if (!empty($d['billing_first_name'][0]) || !empty($d['billing_last_name'][0])) {
-                    $companyName = $d['billing_first_name'][0] . " " . $d['billing_last_name'][0];
-                    $isFirstnameAndLastname = true;
-                } else {
-                    $companyName = $d['nicename'][0];
-                }
+        if ($userId != 0) {
+            $this->wcCustomer = $wcCustomer;
+            $d = get_user_meta($userId);
+            $meta = function ($key) use ($d) {
+                return isset($d[$key][0]) ? $d[$key][0] : '';
+            };
+            $this->internalId = $userId;
 
-                $this->internalId = $wcCustomer->ID;
-                $this->companyName = $companyName;
-                $this->companyAddressContactName = !$isFirstnameAndLastname ? f($d['first_name'][0]) . " " . f($d['last_name'][0]) : "";
-                $this->companyAddressStreet = f($d['billing_address_1'][0]);
-                $this->companyAddressZipCode = f($d['billing_postcode'][0]);
-                $this->companyAddressCity = f($d['billing_city'][0]);
-                $this->companyAddressCountry = f($d['billing_country'][0]);
-                $this->companyCategories = array();
-                $this->employeeFirstname = f($d['first_name'][0]);
-                $this->employeeLastname = f($d['last_name'][0]);
-                $this->employeeEmail = $billingEmail;
-                $this->employeePhoneNumber = f($d['billing_phone'][0]);
+            if ($isRegister) {
+                $this->companyName = $meta('nickname');
+                $this->employeeFirstname = $meta('first_name');
+                $this->employeeLastname = $meta('last_name');
+                $this->employeeEmail = $userEmail;
+                return;
+            }
+
+            $billingEmail = $meta('billing_email') !== '' ? $meta('billing_email') : $userEmail;
+
+            $isFirstnameAndLastname = false;
+            if ($meta('billing_company') !== '') {
+                $companyName = $meta('billing_company');
+            } else if ($meta('billing_first_name') !== '' || $meta('billing_last_name') !== '') {
+                $companyName = $meta('billing_first_name') . " " . $meta('billing_last_name');
+                $isFirstnameAndLastname = true;
             } else {
-                // Utilisateur pas inscrit à la boutique, a fait une commande
-                if ($order != null) {
-                    $this->internalId = $order->get_billing_email();
-                    $this->companyName = !empty($order->get_billing_company()) ? $order->get_billing_company() : $order->get_billing_first_name() . " " . $order->get_billing_last_name();
-                    $this->companyAddressContactName = !empty($order->get_billing_company()) ? $order->get_billing_first_name() . " " . $order->get_billing_last_name() : "";
-                    $this->companyAddressStreet = $order->get_billing_address_1() . " " . $order->get_billing_address_2();
-                    $this->companyAddressZipCode = $order->get_billing_postcode();
-                    $this->companyAddressCity = $order->get_billing_city();
-                    $this->companyAddressCountry = $order->get_billing_country();
-                    $this->companyCategories = array("Client");
-                    $this->employeeFirstname = $order->get_billing_first_name();
-                    $this->employeeLastname = $order->get_billing_last_name();
-                    $this->employeeEmail = $order->get_billing_email();
-                    $this->employeePhoneNumber = $order->get_billing_phone();
-                }
+                $companyName = $meta('nickname');
             }
-        } else {
-            if ($wcCustomer->ID != 0) {
-                $this->wcCustomer = $wcCustomer;
-                $d = get_user_meta($wcCustomer->ID);
-                $this->internalId = $wcCustomer->ID;
-                $this->companyName = $d["nickname"][0];
-                $this->employeeFirstname = $d['first_name'][0];
-                $this->employeeLastname = $d['last_name'][0];
-                $this->employeeEmail = $wcCustomer->data->user_email;
-            }
+
+            $this->companyName = $companyName;
+            $this->companyAddressContactName = !$isFirstnameAndLastname ? $meta('first_name') . " " . $meta('last_name') : "";
+            $this->companyAddressStreet = $meta('billing_address_1');
+            $this->companyAddressZipCode = $meta('billing_postcode');
+            $this->companyAddressCity = $meta('billing_city');
+            $this->companyAddressCountry = $meta('billing_country');
+            $this->companyCategories = array();
+            $this->employeeFirstname = $meta('first_name');
+            $this->employeeLastname = $meta('last_name');
+            $this->employeeEmail = $billingEmail;
+            $this->employeePhoneNumber = $meta('billing_phone');
+        } else if (!$isRegister && $order != null) {
+            // Utilisateur pas inscrit à la boutique, a fait une commande
+            $this->internalId = $order->get_billing_email();
+            $this->companyName = !empty($order->get_billing_company()) ? $order->get_billing_company() : $order->get_billing_first_name() . " " . $order->get_billing_last_name();
+            $this->companyAddressContactName = !empty($order->get_billing_company()) ? $order->get_billing_first_name() . " " . $order->get_billing_last_name() : "";
+            $this->companyAddressStreet = $order->get_billing_address_1() . " " . $order->get_billing_address_2();
+            $this->companyAddressZipCode = $order->get_billing_postcode();
+            $this->companyAddressCity = $order->get_billing_city();
+            $this->companyAddressCountry = $order->get_billing_country();
+            $this->companyCategories = array("Client");
+            $this->employeeFirstname = $order->get_billing_first_name();
+            $this->employeeLastname = $order->get_billing_last_name();
+            $this->employeeEmail = $order->get_billing_email();
+            $this->employeePhoneNumber = $order->get_billing_phone();
         }
     }
 
@@ -106,7 +104,7 @@ class AxonautCustomer
      */
     public function send()
     {
-        axonaut_write_log("[ Customer : " . $this->wcCustomer->ID . " ] Sending company from WooCommerce to Axonaut...");
+        axonaut_write_log("[ Customer : " . $this->internalId . " ] Sending company from WooCommerce to Axonaut...");
 
 	    $body = array(
 	        // Company data
@@ -131,7 +129,7 @@ class AxonautCustomer
             return null;
         }
 
-        axonaut_write_log("[ Customer : " . $this->wcCustomer->ID . " ] Synchronization of the company has been successful (" . $result['data']["company_id"] . ").");
+        axonaut_write_log("[ Customer : " . $this->internalId . " ] Synchronization of the company has been successful (" . $result['data']["company_id"] . ").");
 
         return true;
     }

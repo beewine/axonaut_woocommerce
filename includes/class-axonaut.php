@@ -186,9 +186,11 @@ class Axonaut
 
         $this->loader->add_action('wp_enqueue_styles', $plugin_public, 'enqueue_styles');
         $this->loader->add_action('wp_enqueue_scripts', $plugin_public, 'enqueue_scripts');
-        $this->loader->add_action('woocommerce_order_status_completed', $plugin_public, 'hook_sell_pay');
-        $this->loader->add_action('woocommerce_order_status_processing', $plugin_public, 'hook_sell');
-        $this->loader->add_action('woocommerce_order_status_cancelled', $plugin_public, 'hook_cancel_order');
+        $this->loader->add_action('woocommerce_order_status_completed', 'Axonaut_Order_Sync', 'on_completed');
+        $this->loader->add_action('woocommerce_order_status_processing', 'Axonaut_Order_Sync', 'on_processing');
+        $this->loader->add_action('woocommerce_order_status_cancelled', 'Axonaut_Order_Sync', 'on_cancelled');
+        $this->loader->add_action('woocommerce_order_refunded', 'Axonaut_Order_Sync', 'on_refunded', 10, 2);
+        $this->loader->add_action(Axonaut_Order_Sync::HOOK, 'Axonaut_Order_Sync', 'run', 10, 4);
         $this->loader->add_action('user_register', $plugin_public, 'hook_register');
         $this->loader->add_action(Axonaut_Queue::HOOK_PRODUCT, 'Axonaut_Product_Sync', 'run');
         $this->loader->add_action(Axonaut_Queue::HOOK_STOCK, 'Axonaut_Stock_Sync', 'run');
